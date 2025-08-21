@@ -2,38 +2,48 @@ name: Deploy ASETEC Eventos to Kinsta
 
 on:
   push:
-    branches: [ "main" ]     # despliega con push a main
-  workflow_dispatch:          # permite ejecutarlo manualmente
+    branches: ["main"]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Paso A: probar conexión y ver el directorio remoto
-      - name: SSH - ls remote plugin dir
+      # Solo como sanity check local
+      - name: List local plugin files
+        run: ls -la asetec-eventos || (echo "Falta carpeta asetec-eventos" && exit 1)
+
+      # Asegura que la ruta remota exista y la muestra
+      - name: SSH - ensure remote dir
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
           password: ${{ secrets.SFTP_PASS }}
-          port: ${{ secrets.SFTP_PORT }}
+          port: ${{ secrets.SFTP_PORT }}            # ej. 6022
           script: |
-            echo "PWD:"
-            pwd
-            echo "Listing plugin dir:"
-            ls -la ${{ secrets.SFTP_PATH }}
+            set -e
+            PLUGINDIR="${{ secrets.SFTP_PATH }}"    # ej. /www/xxx/public/wp-content/plugins/asetec-eventos
+            mkdir -p "$PLUGINDIR"
+            echo "Remote PWD: $(pwd)"
+            echo "Listing $PLUGINDIR"
+            ls -la "$PLUGINDIR"
 
-      # Paso B: copiar archivos del plugin
-      - name: SCP - upload plugin files
+      # Sube el plugin (recursivo) y reemplaza archivos
+      - name: SCP - upload plugin (recursive, clean target)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
           password: ${{ secrets.SFTP_PASS }}
           port: ${{ secrets.SFTP_PORT }}
-          source: "asetec-eventos/*"
-          target: ${{ secrets.SFTP_PATH }}
+          source: "asetec-eventos/**"               # incluye subcarpetas
+          target: ${{ secrets.SFTP_PATH }}          # ruta ABSOLUTA al folder del plugin
+          rm: true                                  # borra contenido previo del folder destino
           overwrite: true
+          strip_components: 1                       # evita crear carpeta extra dentro del destino
+
