@@ -2,48 +2,46 @@ name: Deploy ASETEC Eventos to Kinsta
 
 on:
   push:
-    branches: ["main"]
-  workflow_dispatch:
+    branches: ["main"]       # despliega en push a main
+  workflow_dispatch:         # permite ejecutarlo manualmente
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout código
         uses: actions/checkout@v4
 
-      # Solo como sanity check local
-      - name: List local plugin files
-        run: ls -la asetec-eventos || (echo "Falta carpeta asetec-eventos" && exit 1)
+      # Validar que exista la carpeta local
+      - name: Ver archivos locales
+        run: ls -la asetec-eventos || (echo "❌ No existe la carpeta asetec-eventos" && exit 1)
 
-      # Asegura que la ruta remota exista y la muestra
-      - name: SSH - ensure remote dir
+      # Conectarse por SSH y verificar carpeta destino
+      - name: SSH - Verificar carpeta remota
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
           password: ${{ secrets.SFTP_PASS }}
-          port: ${{ secrets.SFTP_PORT }}            # ej. 6022
+          port: ${{ secrets.SFTP_PORT }}
           script: |
             set -e
-            PLUGINDIR="${{ secrets.SFTP_PATH }}"    # ej. /www/xxx/public/wp-content/plugins/asetec-eventos
+            PLUGINDIR="/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
+            echo "Verificando carpeta destino: $PLUGINDIR"
             mkdir -p "$PLUGINDIR"
-            echo "Remote PWD: $(pwd)"
-            echo "Listing $PLUGINDIR"
             ls -la "$PLUGINDIR"
 
-      # Sube el plugin (recursivo) y reemplaza archivos
-      - name: SCP - upload plugin (recursive, clean target)
+      # Subir los archivos del plugin
+      - name: SCP - Deploy plugin
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
           password: ${{ secrets.SFTP_PASS }}
           port: ${{ secrets.SFTP_PORT }}
-          source: "asetec-eventos/**"               # incluye subcarpetas
-          target: ${{ secrets.SFTP_PATH }}          # ruta ABSOLUTA al folder del plugin
-          rm: true                                  # borra contenido previo del folder destino
+          source: "asetec-eventos/**"
+          target: "/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
           overwrite: true
-          strip_components: 1                       # evita crear carpeta extra dentro del destino
-
+          rm: true                  # limpia antes de copiar
+          strip_components: 1       # evita carpeta extra dentro del destino
