@@ -2,8 +2,8 @@ name: Deploy ASETEC Eventos to Kinsta
 
 on:
   push:
-    branches: [ "main" ]     # despliega con push a main
-  workflow_dispatch:          # permite ejecutarlo manualmente
+    branches: [ "main" ]   # despliega cuando hagas push a main
+  workflow_dispatch:       # permite lanzarlo manualmente
 
 jobs:
   deploy:
@@ -13,17 +13,12 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy via SFTP
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
         with:
-          server: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
-          password: ${{ secrets.SFTP_PASS }}
+          server: ${{ secrets.SFTP_HOST }}
           port: ${{ secrets.SFTP_PORT }}
-          protocol: "sftp"
-          server-dir: ${{ secrets.SFTP_PATH }}
-          local-dir: "./asetec-eventos/"   # <- barra final obligatoria
-          exclude: |
-            **/.git*
-            **/.github*
-            **/node_modules/**
-            **/vendor/**
+          password: ${{ secrets.SFTP_PASS }}
+          local_path: "./asetec-eventos/*"
+          remote_path: ${{ secrets.SFTP_PATH }}
+          sftp_only: true
