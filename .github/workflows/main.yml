@@ -1,0 +1,32 @@
+name: Deploy ASETEC Eventos to Kinsta
+
+on:
+  push:
+    branches:
+      - main        # despliega cuando hagas push a main
+  workflow_dispatch:  # permite ejecutarlo manualmente desde Actions
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # OJO: ajustá "local-dir" según cómo esté tu repo:
+      #  - Si tu repo tiene la carpeta /asetec-eventos con el plugin dentro, deja ./asetec-eventos
+      #  - Si el plugin está en la raíz del repo, cambia a "./"
+      - name: Deploy via SFTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.SFTP_HOST }}
+          port: ${{ secrets.SFTP_PORT }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASS }}
+          server-dir: ${{ secrets.SFTP_PATH }}
+          local-dir: ./asetec-eventos
+          dangerous-clean-slate: false
+          exclude: |
+            **/.git*
+            **/.github*
+            **/node_modules/**
