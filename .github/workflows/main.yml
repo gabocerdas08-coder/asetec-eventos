@@ -2,8 +2,8 @@ name: Deploy ASETEC Eventos to Kinsta
 
 on:
   push:
-    branches: [ "main" ]   # despliega cuando hagas push a main
-  workflow_dispatch:       # permite lanzarlo manualmente
+    branches: [ "main" ]     # despliega con push a main
+  workflow_dispatch:          # permite ejecutarlo manualmente
 
 jobs:
   deploy:
@@ -12,13 +12,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SFTP
-        uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      # Paso A: probar conexión y ver el directorio remoto
+      - name: SSH - ls remote plugin dir
+        uses: appleboy/ssh-action@v1.0.3
         with:
+          host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
-          server: ${{ secrets.SFTP_HOST }}
-          port: ${{ secrets.SFTP_PORT }}
           password: ${{ secrets.SFTP_PASS }}
-          local_path: "./asetec-eventos/*"
-          remote_path: ${{ secrets.SFTP_PATH }}
-          sftp_only: true
+          port: ${{ secrets.SFTP_PORT }}
+          script: |
+            echo "PWD:"
+            pwd
+            echo "Listing plugin dir:"
+            ls -la ${{ secrets.SFTP_PATH }}
+
+      # Paso B: copiar archivos del plugin
+      - name: SCP - upload plugin files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASS }}
+          port: ${{ secrets.SFTP_PORT }}
+          source: "asetec-eventos/*"
+          target: ${{ secrets.SFTP_PATH }}
+          overwrite: true
