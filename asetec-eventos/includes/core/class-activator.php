@@ -6,7 +6,7 @@ class Asetec_Activator {
     global $wpdb; require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $charset = $wpdb->get_charset_collate();
 
-    // Tabla de eventos
+    // Eventos
     $sql1 = "CREATE TABLE {$wpdb->prefix}asetec_events (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       code VARCHAR(50) NOT NULL UNIQUE,
@@ -19,7 +19,7 @@ class Asetec_Activator {
       updated_at DATETIME NULL
     ) $charset;";
 
-    // Tabla de tickets
+    // Tickets (para módulo 2/3: QR y check-in)
     $sql2 = "CREATE TABLE {$wpdb->prefix}asetec_tickets (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       event_id BIGINT UNSIGNED NOT NULL,
@@ -41,7 +41,17 @@ class Asetec_Activator {
       KEY idx_cedula (cedula)
     ) $charset;";
 
+    // Padrón de asociados (CSV)
+    $sql3 = "CREATE TABLE {$wpdb->prefix}asetec_members (
+      cedula VARCHAR(20) NOT NULL PRIMARY KEY,
+      nombre VARCHAR(180) NOT NULL,
+      email VARCHAR(180) NOT NULL,
+      activo TINYINT(1) NOT NULL DEFAULT 1,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) $charset;";
+
     dbDelta($sql1);
     dbDelta($sql2);
+    dbDelta($sql3);
   }
 }
