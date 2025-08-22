@@ -1,8 +1,0 @@
-name: smoke
-on: [push, workflow_dispatch]
-
-jobs:
-  t:
-    runs-on: ubuntu-22.04
-    steps:
-      - run: echo "runner: $(uname -a)"; date
