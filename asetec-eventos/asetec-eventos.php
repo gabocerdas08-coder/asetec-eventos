@@ -2,7 +2,7 @@
 /**
  * Plugin Name: ASETEC Eventos
  * Description: Control de entradas con PDF+QR, check-in y sorteos (esqueleto).
- * Version: 0.0.4
+ * Version: 0.0.5
  * Author: ASETEC TI
  */
 if (!defined('ABSPATH')) exit;
