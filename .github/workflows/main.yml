@@ -2,23 +2,26 @@ name: Deploy ASETEC Eventos to Kinsta
 
 on:
   push:
-    branches: ["main"]       # despliega en push a main
-  workflow_dispatch:         # permite ejecutarlo manualmente
+    branches: ["main"]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-asetec-eventos
+  cancel-in-progress: true
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
 
     steps:
-      - name: Checkout código
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # Validar que exista la carpeta local
       - name: Ver archivos locales
-        run: ls -la asetec-eventos || (echo "❌ No existe la carpeta asetec-eventos" && exit 1)
+        run: ls -la asetec-eventos || (echo "❌ Falta carpeta asetec-eventos" && exit 1)
 
-      # Conectarse por SSH y verificar carpeta destino
-      - name: SSH - Verificar carpeta remota
+      - name: SSH - verificar carpeta remota
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SFTP_HOST }}
@@ -28,20 +31,18 @@ jobs:
           script: |
             set -e
             PLUGINDIR="/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
-            echo "Verificando carpeta destino: $PLUGINDIR"
             mkdir -p "$PLUGINDIR"
+            echo "Contenido en $PLUGINDIR:"
             ls -la "$PLUGINDIR"
 
-      # Subir los archivos del plugin
-      - name: SCP - Deploy plugin
+      - name: SCP - subir plugin
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
           password: ${{ secrets.SFTP_PASS }}
           port: ${{ secrets.SFTP_PORT }}
-          source: "asetec-eventos/**"
+          source: "asetec-eventos/*"   # copia el contenido de la carpeta
           target: "/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
           overwrite: true
-          rm: true                  # limpia antes de copiar
-          strip_components: 1       # evita carpeta extra dentro del destino
+          rm: true                     # limpia el destino antes de copiar
