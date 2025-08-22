@@ -6,6 +6,7 @@ class Asetec_Activator {
     global $wpdb; require_once ABSPATH . 'wp-admin/includes/upgrade.php';
     $charset = $wpdb->get_charset_collate();
 
+    // Tabla de eventos
     $sql1 = "CREATE TABLE {$wpdb->prefix}asetec_events (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       code VARCHAR(50) NOT NULL UNIQUE,
@@ -18,6 +19,7 @@ class Asetec_Activator {
       updated_at DATETIME NULL
     ) $charset;";
 
+    // Tabla de tickets
     $sql2 = "CREATE TABLE {$wpdb->prefix}asetec_tickets (
       id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       event_id BIGINT UNSIGNED NOT NULL,
