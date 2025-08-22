@@ -21,7 +21,7 @@ jobs:
       - name: Ver archivos locales
         run: ls -la asetec-eventos || (echo "❌ Falta carpeta asetec-eventos" && exit 1)
 
-      - name: SSH - verificar carpeta remota
+      - name: SSH - preparar carpeta destino
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SFTP_HOST }}
@@ -31,18 +31,36 @@ jobs:
           script: |
             set -e
             PLUGINDIR="/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
+            # limpiar el destino para evitar doble carpeta / residuos
+            rm -rf "$PLUGINDIR"
             mkdir -p "$PLUGINDIR"
-            echo "Contenido en $PLUGINDIR:"
-            ls -la "$PLUGINDIR"
+            echo "Destino preparado: $PLUGINDIR"
 
-      - name: SCP - subir plugin
+      - name: SCP - subir contenido del plugin (sin doble carpeta)
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SFTP_HOST }}
           username: ${{ secrets.SFTP_USER }}
           password: ${{ secrets.SFTP_PASS }}
           port: ${{ secrets.SFTP_PORT }}
-          source: "asetec-eventos/*"   # copia el contenido de la carpeta
+          source: "asetec-eventos/**"                 # incluye subcarpetas y archivos ocultos
           target: "/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
           overwrite: true
-          rm: true                     # limpia el destino antes de copiar
+          rm: false
+          strip_components: 1                         # <-- evita crear 'asetec-eventos' dentro del destino
+
+      - name: SSH - verificación final
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SFTP_HOST }}
+          username: ${{ secrets.SFTP_USER }}
+          password: ${{ secrets.SFTP_PASS }}
+          port: ${{ secrets.SFTP_PORT }}
+          script: |
+            set -e
+            PLUGINDIR="/www/internoaseteccom_556/public/wp-content/plugins/asetec-eventos"
+            echo "Contenido final:"
+            find "$PLUGINDIR" -maxdepth 2 -type f -printf "%p\n"
+            # mostrar encabezado del archivo principal por si WP no lo detecta
+            echo "Header de asetec-eventos.php:"
+            head -n 20 "$PLUGINDIR/asetec-eventos.php" || true
