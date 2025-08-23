@@ -104,22 +104,46 @@ class Asetec_Admin_Menu {
   }
 
   /** ====== Asociados (CSV) ====== */
-  public function render_members() {
-    $imported = intval($_GET['imported'] ?? 0);
-    ?>
-    <div class="wrap">
-      <h1>Asociados — Importar/Actualizar CSV</h1>
-      <?php if($imported): ?><div class="notice notice-success"><p>Importados/actualizados: <?php echo esc_html($imported); ?></p></div><?php endif; ?>
-      <p>Formato recomendado (UTF-8, separador coma o punto y coma): <code>cedula,nombre,email,activo</code>. La <b>cédula</b> es la llave única.</p>
-      <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" enctype="multipart/form-data">
-        <?php wp_nonce_field('asetec_members_csv'); ?>
-        <input type="hidden" name="action" value="asetec_members_upload">
-        <input type="file" name="csv" accept=".csv" required>
-        <p><button class="button button-primary">Subir/Actualizar</button></p>
-      </form>
-    </div>
-    <?php
-  }
+public function render_members() {
+  $imported = isset($_GET['imported']) ? intval($_GET['imported']) : null;
+  $purged   = isset($_GET['purged'])   ? intval($_GET['purged'])   : null;
+  $total    = isset($_GET['total'])    ? intval($_GET['total'])    : null;
+  ?>
+  <div class="wrap">
+    <h1>Asociados — Importar/Actualizar CSV</h1>
+
+    <?php if($imported !== null || $purged !== null || $total !== null): ?>
+      <div class="notice notice-success">
+        <p>
+          <?php if($imported !== null): ?>
+            <b>Procesados (insertados/actualizados):</b> <?php echo esc_html($imported); ?><br>
+          <?php endif; ?>
+          <?php if($purged !== null): ?>
+            <b>Borrados por reemplazo (purge):</b> <?php echo esc_html($purged); ?><br>
+          <?php endif; ?>
+          <?php if($total !== null): ?>
+            <b>Total actual en la base:</b> <?php echo esc_html($total); ?>
+          <?php endif; ?>
+        </p>
+      </div>
+    <?php endif; ?>
+
+    <p>Formato recomendado (UTF-8, separador coma o punto y coma): <code>cedula,nombre,email,activo</code>. La <b>cédula</b> es la llave única.</p>
+
+    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" enctype="multipart/form-data">
+      <?php wp_nonce_field('asetec_members_csv'); ?>
+      <input type="hidden" name="action" value="asetec_members_upload">
+      <input type="file" name="csv" accept=".csv" required>
+      <br><br>
+      <label>
+        <input type="checkbox" name="purge" value="1">
+        Reemplazar todo (borra los asociados que no estén en este CSV)
+      </label>
+      <p><button class="button button-primary">Subir/Actualizar</button></p>
+    </form>
+  </div>
+  <?php
+}
 
   /** ====== Reportes ====== */
   public function render_reports() {
