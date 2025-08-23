@@ -108,9 +108,14 @@ public function render_members() {
   $imported = isset($_GET['imported']) ? intval($_GET['imported']) : null;
   $purged   = isset($_GET['purged'])   ? intval($_GET['purged'])   : null;
   $total    = isset($_GET['total'])    ? intval($_GET['total'])    : null;
+  $cleared  = isset($_GET['cleared'])  ? intval($_GET['cleared'])  : null;
   ?>
   <div class="wrap">
     <h1>Asociados — Importar/Actualizar CSV</h1>
+
+    <?php if($cleared): ?>
+      <div class="notice notice-success"><p>La base de asociados fue vaciada.</p></div>
+    <?php endif; ?>
 
     <?php if($imported !== null || $purged !== null || $total !== null): ?>
       <div class="notice notice-success">
@@ -129,6 +134,7 @@ public function render_members() {
     <?php endif; ?>
 
     <p>Formato recomendado (UTF-8, separador coma o punto y coma): <code>cedula,nombre,email,activo</code>. La <b>cédula</b> es la llave única.</p>
+
     <h2>Opciones avanzadas</h2>
     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
       <?php wp_nonce_field('asetec_members_clear'); ?>
@@ -139,20 +145,19 @@ public function render_members() {
     </form>
     <hr>
 
+    <h2>Importar CSV</h2>
     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" enctype="multipart/form-data">
       <?php wp_nonce_field('asetec_members_csv'); ?>
       <input type="hidden" name="action" value="asetec_members_upload">
       <input type="file" name="csv" accept=".csv" required>
       <br><br>
-      <label>
-        <input type="checkbox" name="purge" value="1">
-        Reemplazar todo (borra los asociados que no estén en este CSV)
-      </label>
+      <label><input type="checkbox" name="purge" value="1"> Reemplazar todo (borra los asociados que no estén en este CSV)</label>
       <p><button class="button button-primary">Subir/Actualizar</button></p>
     </form>
   </div>
   <?php
 }
+
 
   /** ====== Reportes ====== */
   public function render_reports() {
