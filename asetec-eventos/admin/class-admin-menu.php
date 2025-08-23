@@ -109,9 +109,15 @@ public function render_members() {
   $purged   = isset($_GET['purged'])   ? intval($_GET['purged'])   : null;
   $total    = isset($_GET['total'])    ? intval($_GET['total'])    : null;
   $cleared  = isset($_GET['cleared'])  ? intval($_GET['cleared'])  : null;
+  $upload_error = isset($_GET['upload_error']) ? sanitize_text_field($_GET['upload_error']) : '';
+
   ?>
   <div class="wrap">
     <h1>Asociados — Importar/Actualizar CSV</h1>
+
+    <?php if($upload_error): ?>
+      <div class="notice notice-error"><p><b>Error de carga:</b> <?php echo esc_html($upload_error); ?></p></div>
+    <?php endif; ?>
 
     <?php if($cleared): ?>
       <div class="notice notice-success"><p>La base de asociados fue vaciada.</p></div>
@@ -149,7 +155,7 @@ public function render_members() {
     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" enctype="multipart/form-data">
       <?php wp_nonce_field('asetec_members_csv'); ?>
       <input type="hidden" name="action" value="asetec_members_upload">
-      <input type="file" name="csv" accept=".csv" required>
+      <input type="file" name="csv" accept=".csv,.txt" required>
       <br><br>
       <label><input type="checkbox" name="purge" value="1"> Reemplazar todo (borra los asociados que no estén en este CSV)</label>
       <p><button class="button button-primary">Subir/Actualizar</button></p>
@@ -157,6 +163,7 @@ public function render_members() {
   </div>
   <?php
 }
+
 
 
   /** ====== Reportes ====== */
