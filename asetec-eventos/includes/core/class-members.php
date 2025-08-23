@@ -76,12 +76,27 @@ class Asetec_Members {
     if (!$f) wp_die('No se pudo abrir el CSV.');
 
     // Leer encabezado (opcional)
+// Leer encabezado (opcional)
     $header     = fgetcsv($f, 0, $delimiter);
     $hasHeader  = is_array($header) && count($header) >= 2;
     $map        = $hasHeader ? array_flip(array_map('strtolower', array_map('trim', $header))) : [];
 
-    $count = 0;
-    global $wpdb;
+    /**
+     * Si detectamos "encabezado" pero NO trae "cedula",
+     * volvemos a modo SIN encabezado (posición fija) y
+     * reabrimos el archivo para no perder la primera línea.
+     */
+    if ($hasHeader && !isset($map['cedula'])) {
+      // Reabrir el archivo desde el inicio y NO usar encabezado
+      @fclose($f);
+      $f = @fopen($tmp, 'r');
+      if (!$f) wp_die('No se pudo reabrir el CSV.');
+      // Saltar autodetección anterior, leeremos todo como "sin encabezado"
+      $header    = null;
+      $hasHeader = false;
+      $map       = [];
+} 
+
 
     // Asegurar que la tabla existe para evitar errores en sitios con activación previa fallida
     $wpdb->query("CREATE TABLE IF NOT EXISTS {$this->table} (
@@ -186,6 +201,13 @@ class Asetec_Members {
       'purged'   => $purged,
       'total'    => $total,
     ], admin_url('admin.php?page=asetec-asociados'));
+    $url = add_query_arg([
+  'imported' => $count,
+  'purged'   => $purged,
+  'total'    => $total,
+  'dbg_delim'=> ($delimiter === ';' ? 'pcoma' : 'coma'),
+  'dbg_hdr'  => ($hasHeader ? 1 : 0),
+], admin_url('admin.php?page=asetec-asociados'));
 
     wp_redirect($url);
     exit;
