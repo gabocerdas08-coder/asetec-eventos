@@ -145,24 +145,6 @@ class Asetec_Members {
     wp_redirect($url); 
     exit;
   }
-  public function __construct() {
-  global $wpdb; 
-  $this->table = $wpdb->prefix.'asetec_members';
-  add_action('admin_post_asetec_members_upload', [$this,'upload']);
-  add_action('admin_post_asetec_members_clear', [$this,'clear']); // nuevo
-}
-
-// Nuevo método
-public function clear() {
-  if (!current_user_can('manage_options')) wp_die('No autorizado');
-  check_admin_referer('asetec_members_clear');
-
-  global $wpdb;
-  $wpdb->query("TRUNCATE TABLE {$this->table}");
-
-  wp_redirect(admin_url('admin.php?page=asetec-asociados&cleared=1'));
-  exit;
-}
 
 
 

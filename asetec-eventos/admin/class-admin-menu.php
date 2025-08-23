@@ -129,7 +129,15 @@ public function render_members() {
     <?php endif; ?>
 
     <p>Formato recomendado (UTF-8, separador coma o punto y coma): <code>cedula,nombre,email,activo</code>. La <b>cédula</b> es la llave única.</p>
-
+    <h2>Opciones avanzadas</h2>
+    <form method="post" action="<?php echo admin_url('admin-post.php'); ?>">
+      <?php wp_nonce_field('asetec_members_clear'); ?>
+      <input type="hidden" name="action" value="asetec_members_clear">
+      <button class="button" onclick="return confirm('¿Seguro que quieres vaciar toda la base de asociados? Esta acción no se puede deshacer.');">
+        Vaciar base de asociados
+      </button>
+    </form>
+    <hr>
 
     <form method="post" action="<?php echo admin_url('admin-post.php'); ?>" enctype="multipart/form-data">
       <?php wp_nonce_field('asetec_members_csv'); ?>
