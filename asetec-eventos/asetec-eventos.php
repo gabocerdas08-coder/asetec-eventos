@@ -22,6 +22,7 @@ $files = [
   __DIR__ . '/includes/core/class-members.php',
   __DIR__ . '/admin/class-admin-menu.php',
   __DIR__ . '/includes/shortcodes.php',
+  __DIR__ . '/includes/api/class-board-api.php',
 ];
 
 $missing = array_filter($files, fn($f) => !file_exists($f));
@@ -45,12 +46,12 @@ require_once $files[1]; // Events
 require_once $files[2]; // Members (upload CSV)
 require_once $files[3]; // Admin Menu
 require_once $files[4]; // Shortcodes
+require_once $files[5]; // <-- Board API (REST)
 
 /** Activación (crea/actualiza tablas) */
 if (class_exists('Asetec_Activator')) {
   register_activation_hook(__FILE__, ['Asetec_Activator','activate']);
 }
-
 
 
 /** Bootstrap */
@@ -59,4 +60,5 @@ add_action('plugins_loaded', function () {
   if (class_exists('Asetec_Members')) new Asetec_Members();
   // Menú y pantallas
   if (class_exists('Asetec_Admin_Menu')) new Asetec_Admin_Menu();
+  if (class_exists('Asetec_Board_API')) new Asetec_Board_API();
 });
