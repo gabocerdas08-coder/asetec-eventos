@@ -394,4 +394,160 @@ if (!function_exists('asetec_sc_event_matrix')) {
     return ob_get_clean();
   }
   add_shortcode('asetec_event_matrix', 'asetec_sc_event_matrix');
+  <?php
+if (!defined('ABSPATH')) exit;
+
+/**
+ * [asetec_event_table event_code="PA2025" per_page="50"]
+ * Tabla pública: búsqueda + filtros por estado.
+ * Columnas: Cédula | Nombre | Estado | Cupo
+ * NOTA: Es pública; si luego querés, puedes limitar a usuarios logueados.
+ */
+if (!function_exists('asetec_sc_event_table')) {
+  function asetec_sc_event_table($atts=[]) {
+    global $wpdb;
+
+    $a = shortcode_atts(['event_code'=>'', 'per_page'=>50], $atts);
+    $event_code = sanitize_text_field($a['event_code']);
+    $per_page   = max(1, intval($a['per_page']));
+    if (!$event_code) return '<p><em>Falta <code>event_code</code>.</em></p>';
+
+    // Resolver evento
+    $ev = $wpdb->get_row($wpdb->prepare(
+      "SELECT id, code, name FROM {$wpdb->prefix}asetec_events WHERE code=%s", $event_code
+    ), ARRAY_A);
+    if (!$ev) return '<p><em>Evento no encontrado.</em></p>';
+
+    $t = $wpdb->prefix.'asetec_tickets';
+    $m = $wpdb->prefix.'asetec_members';
+
+    // Filtros desde GET (para no crear sesiones)
+    $q      = isset($_GET['q']) ? sanitize_text_field($_GET['q']) : '';
+    $estado = isset($_GET['estado']) ? sanitize_text_field($_GET['estado']) : 'all'; // all|no_qr|solicito|checkin
+    $page   = max(1, intval($_GET['p'] ?? 1));
+    $offset = ($page - 1) * $per_page;
+
+    // Construcción WHERE con placeholders seguros
+    $conds = ["m.activo=1"];
+    $params = [];
+
+    if ($q !== '') {
+      $conds[] = "(m.cedula LIKE %s OR m.nombre LIKE %s)";
+      $like = '%'.$wpdb->esc_like($q).'%';
+      $params[] = $like; $params[] = $like;
+    }
+
+    // Estado vía LEFT JOIN a tickets del evento
+    $estadoWhere = "";
+    if ($estado === 'no_qr') {
+      $estadoWhere = " AND tk.id IS NULL";
+    } elseif ($estado === 'solicito') {
+      $estadoWhere = " AND tk.id IS NOT NULL";
+    } elseif ($estado === 'checkin') {
+      $estadoWhere = " AND tk.status='checked_in'";
+    }
+    $where = implode(' AND ', $conds);
+
+    // TOTAL para paginar
+    $sqlTotal = "
+      SELECT COUNT(*) FROM $m m
+      LEFT JOIN $t tk ON tk.cedula=m.cedula AND tk.event_id=%d
+      WHERE $where $estadoWhere
+    ";
+    $total = (int) call_user_func_array(
+      [$wpdb,'get_var'],
+      [ call_user_func_array([$wpdb,'prepare'], array_merge([$sqlTotal, $ev['id']], $params)) ]
+    );
+
+    // Filas (con LIMIT)
+    $sqlRows = "
+      SELECT m.cedula, m.nombre, tk.status AS tk_status, COALESCE(tk.party_size,1) AS party_size
+      FROM $m m
+      LEFT JOIN $t tk ON tk.cedula=m.cedula AND tk.event_id=%d
+      WHERE $where $estadoWhere
+      ORDER BY m.nombre ASC
+      LIMIT %d OFFSET %d
+    ";
+    $rows = call_user_func_array(
+      [$wpdb,'get_results'],
+      [ call_user_func_array([$wpdb,'prepare'], array_merge([$sqlRows, $ev['id']], $params, [$per_page, $offset])), ARRAY_A ]
+    );
+
+    // Render
+    $current_url = (function(){
+      $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+      $host   = $_SERVER['HTTP_HOST'] ?? '';
+      $uri    = $_SERVER['REQUEST_URI'] ?? '';
+      return $scheme.'://'.$host.$uri;
+    })();
+
+    // Base sin p
+    $base_url = remove_query_arg('p', $current_url);
+
+    $pages = max(1, ceil(max(1,$total)/$per_page));
+
+    ob_start();
+    echo '<div class="asetec-table">';
+    echo '<h3>'.esc_html($ev['code'].' — '.$ev['name']).'</h3>';
+
+    // Form filtros
+    echo '<form method="get" class="asetec-filter" style="margin:12px 0;">';
+    // conservar otros GET (por si la página tiene más)
+    foreach ($_GET as $k=>$v) {
+      if (in_array($k, ['q','estado','p'])) continue;
+      echo '<input type="hidden" name="'.esc_attr($k).'" value="'.esc_attr($v).'">';
+    }
+    echo '<input type="hidden" name="event_code" value="'.esc_attr($event_code).'">';
+    echo '<input type="text" name="q" placeholder="Buscar cédula o nombre" value="'.esc_attr($q).'" style="min-width:260px;"> ';
+    echo '<select name="estado">';
+      $opts = ['all'=>'Todos','no_qr'=>'No solicitó QR','solicito'=>'Solicitó QR','checkin'=>'Check-in'];
+      foreach ($opts as $key=>$label) {
+        $sel = $estado===$key ? ' selected' : '';
+        echo '<option value="'.esc_attr($key).'"'.$sel.'>'.esc_html($label).'</option>';
+      }
+    echo '</select> ';
+    echo '<button>Filtrar</button>';
+    echo '</form>';
+
+    // Tabla
+    echo '<table class="widefat fixed striped"><thead><tr>';
+    echo '<th style="width:140px">Cédula</th><th>Nombre</th><th>Estado</th><th style="width:80px;text-align:center">Cupo</th>';
+    echo '</tr></thead><tbody>';
+
+    if (!$rows) {
+      echo '<tr><td colspan="4"><em>Sin datos para los filtros aplicados.</em></td></tr>';
+    } else {
+      foreach ($rows as $r) {
+        $estado_txt = '—';
+        if ($r['tk_status'] === null) $estado_txt = 'No solicitó QR';
+        elseif ($r['tk_status'] === 'issued') $estado_txt = 'Solicitó QR';
+        elseif ($r['tk_status'] === 'checked_in') $estado_txt = 'Check-in';
+
+        echo '<tr>';
+        echo '<td>'.esc_html($r['cedula']).'</td>';
+        echo '<td>'.esc_html($r['nombre']).'</td>';
+        echo '<td>'.esc_html($estado_txt).'</td>';
+        echo '<td style="text-align:center">'.intval($r['party_size']).'</td>';
+        echo '</tr>';
+      }
+    }
+    echo '</tbody></table>';
+
+    // Paginación
+    if ($pages > 1) {
+      echo '<div class="tablenav"><div class="tablenav-pages">';
+      for ($p=1; $p<=$pages; $p++) {
+        $u = add_query_arg(['p'=>$p], $base_url);
+        $cls = ($p==$page) ? ' class="current button button-secondary"' : ' class="button"';
+        echo '<a'.$cls.' href="'.esc_url($u).'">'.$p.'</a> ';
+      }
+      echo '</div></div>';
+    }
+
+    echo '</div>';
+    return ob_get_clean();
+  }
+  add_shortcode('asetec_event_table', 'asetec_sc_event_table');
+}
+
 }
