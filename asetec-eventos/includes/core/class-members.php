@@ -15,14 +15,31 @@ class Asetec_Members {
     add_action('admin_post_asetec_members_clear',  [$this, 'clear']);
   }
 
+  /** Asegura que la tabla tenga el esquema completo (idempotente). */
+  private function ensure_schema() {
+    global $wpdb;
+    require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+    $charset = $wpdb->get_charset_collate();
+
+    $sql = "CREATE TABLE {$this->table} (
+      cedula VARCHAR(20) NOT NULL PRIMARY KEY,
+      nombre VARCHAR(180) NOT NULL DEFAULT '',
+      email  VARCHAR(180) NOT NULL DEFAULT '',
+      activo TINYINT(1)   NOT NULL DEFAULT 1,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) $charset;";
+
+    // dbDelta crea/actualiza columnas e índices si faltan
+    dbDelta($sql);
+  }
+
   /** Vacía la tabla de asociados. */
   public function clear() {
     if (!current_user_can('manage_options')) wp_die('No autorizado');
     check_admin_referer('asetec_members_clear');
 
     global $wpdb;
-    // Garantizar existencia mínima (por si la activación no corrió)
-    $wpdb->query("CREATE TABLE IF NOT EXISTS {$this->table} (cedula VARCHAR(20) PRIMARY KEY)");
+    $this->ensure_schema();               // asegurar columnas completas
     $wpdb->query("TRUNCATE TABLE {$this->table}");
 
     $url = add_query_arg(['cleared'=>1, 'total'=>0], admin_url('admin.php?page=asetec-asociados'));
@@ -40,79 +57,60 @@ class Asetec_Members {
     if (!current_user_can('manage_options')) wp_die('No autorizado');
     check_admin_referer('asetec_members_csv');
 
+    // Asegurar esquema correcto ANTES de insertar
+    $this->ensure_schema();
+
     if (empty($_FILES['csv']) || !is_array($_FILES['csv'])) {
       wp_redirect(add_query_arg(['upload_error'=>'Archivo no recibido'], admin_url('admin.php?page=asetec-asociados'))); exit;
     }
 
-    // Log rápido para depurar en el error_log del servidor
-    error_log('[ASETEC CSV] _FILES: ' . print_r($_FILES['csv'], true));
-
-    // Usar API de WP para manejar el upload
+    // Subir a uploads con la API de WP
     require_once ABSPATH . 'wp-admin/includes/file.php';
     $overrides = [
       'test_form' => false,
       'mimes' => [
-        'csv' => 'text/csv',
-        'txt' => 'text/plain',
-        // Excel a veces manda esto para CSV
+        'csv'  => 'text/csv',
+        'txt'  => 'text/plain',
         'csvx' => 'application/vnd.ms-excel',
       ],
     ];
     $move = wp_handle_upload($_FILES['csv'], $overrides);
-
     if (!empty($move['error'])) {
       error_log('[ASETEC CSV] wp_handle_upload error: ' . $move['error']);
       wp_redirect(add_query_arg(['upload_error'=>rawurlencode($move['error'])], admin_url('admin.php?page=asetec-asociados'))); exit;
     }
 
-    $path = $move['file']; // ruta física en uploads
-    error_log('[ASETEC CSV] saved to: ' . $path);
-
-    // Abrir el archivo desde uploads (no /tmp)
+    $path = $move['file'];
     $f = @fopen($path, 'r');
     if (!$f) {
       wp_redirect(add_query_arg(['upload_error'=>'No se pudo abrir el CSV en uploads'], admin_url('admin.php?page=asetec-asociados'))); exit;
     }
 
-    // Leer la primera línea cruda para detectar delimitador
+    // Detectar delimitador en primera línea (quitando BOM)
     $firstLine = fgets($f, 4096);
     if ($firstLine === false) $firstLine = '';
-    // Remover BOM
     if (substr($firstLine, 0, 3) === "\xEF\xBB\xBF") $firstLine = substr($firstLine, 3);
-    // Detectar separador
     $delimiter = (substr_count($firstLine, ';') > substr_count($firstLine, ',')) ? ';' : ',';
-    error_log('[ASETEC CSV] delimiter: ' . $delimiter);
 
-    // Rebobinar y usar fgetcsv normalmente
     rewind($f);
     $header    = fgetcsv($f, 0, $delimiter);
     $hasHeader = is_array($header) && count($header) >= 2;
     $map       = $hasHeader ? array_flip(array_map('strtolower', array_map('trim', $header))) : [];
 
-    // Si “hay encabezado” pero NO trae 'cedula', mejor tratamos el archivo como SIN encabezado
+    // Si “hay encabezado” pero NO trae 'cedula', mejor modo sin encabezado
     if ($hasHeader && !isset($map['cedula'])) {
-      error_log('[ASETEC CSV] header sin "cedula" → modo sin encabezado');
       rewind($f);
       $header    = null;
       $hasHeader = false;
       $map       = [];
-    } else {
-      error_log('[ASETEC CSV] header: ' . json_encode($header));
     }
 
     $purge = !empty($_POST['purge']);
     $seen  = [];
-    $count = 0;
+    $inserted = 0;
+    $updated  = 0;
 
     global $wpdb;
-    // Asegurar estructura (por si activación no corrió)
-    $wpdb->query("CREATE TABLE IF NOT EXISTS {$this->table} (
-      cedula VARCHAR(20) NOT NULL PRIMARY KEY,
-      nombre VARCHAR(180) NOT NULL DEFAULT '',
-      email  VARCHAR(180) NOT NULL DEFAULT '',
-      activo TINYINT(1)   NOT NULL DEFAULT 1,
-      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-    )");
 
     while (($row = fgetcsv($f, 0, $delimiter)) !== false) {
       if (!is_array($row) || count($row) === 0) continue;
@@ -150,12 +148,14 @@ class Asetec_Members {
       ];
 
       $exists = $wpdb->get_var($wpdb->prepare("SELECT cedula FROM {$this->table} WHERE cedula=%s", $cedula));
+
       if ($exists) {
-        $wpdb->update($this->table, $data, ['cedula'=>$cedula], ['%s','%s','%s','%d','%s'], ['%s']);
+        $ok = $wpdb->update($this->table, $data, ['cedula'=>$cedula], ['%s','%s','%s','%d','%s'], ['%s']);
+        if ($ok !== false) { $updated++; } else { error_log('[ASETEC CSV] UPDATE error: '.$wpdb->last_error); }
       } else {
-        $wpdb->insert($this->table, $data, ['%s','%s','%s','%d','%s']);
+        $ok = $wpdb->insert($this->table, $data, ['%s','%s','%s','%d','%s']);
+        if ($ok) { $inserted++; } else { error_log('[ASETEC CSV] INSERT error: '.$wpdb->last_error); }
       }
-      $count++;
     }
     @fclose($f);
 
@@ -175,11 +175,9 @@ class Asetec_Members {
 
     $total = (int)$wpdb->get_var("SELECT COUNT(*) FROM {$this->table}");
 
-    error_log("[ASETEC CSV] imported={$count}, purged={$purged}, total={$total}");
-
-    // Redirigir con métricas o error
+    // Redirigir con métricas reales
     $url = add_query_arg([
-      'imported' => $count,
+      'imported' => ($inserted + $updated),
       'purged'   => $purged,
       'total'    => $total,
     ], admin_url('admin.php?page=asetec-asociados'));
