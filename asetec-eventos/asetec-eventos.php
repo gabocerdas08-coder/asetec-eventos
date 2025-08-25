@@ -51,6 +51,10 @@ if (class_exists('Asetec_Activator')) {
   register_activation_hook(__FILE__, ['Asetec_Activator','activate']);
 }
 
+require_once __DIR__.'/includes/api/class-board-api.php';
+new Asetec_Board_API();
+
+
 /** Bootstrap */
 add_action('plugins_loaded', function () {
   // Inicializar handlers de admin-post (members upload)
