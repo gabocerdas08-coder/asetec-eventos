@@ -39,6 +39,7 @@ $files = array(
   ASETEC_EVT_DIR . '/admin/class-admin-menu.php',
   ASETEC_EVT_INC . '/shortcodes.php',
   ASETEC_EVT_INC . '/api/class-board-api.php', // API REST pública (para la tabla)
+  ASETEC_EVT_INC . '/api/class-zoho-hook.php',      // Integración Zoho 
 );
 
 /** Requerir y recolectar faltantes */
@@ -75,4 +76,5 @@ add_action('plugins_loaded', function () {
   if (class_exists('Asetec_Members'))     { new Asetec_Members(); }
   if (class_exists('Asetec_Admin_Menu'))  { new Asetec_Admin_Menu(); }
   if (class_exists('Asetec_Board_API'))   { new Asetec_Board_API(); } // /wp-json/asetec/v1/...
+  if (class_exists('Asetec_Zoho_Hook')) { new Asetec_Zoho_Hook(); }
 });
