@@ -74,6 +74,9 @@ if (!class_exists('Asetec_Board_API')) {
         case 'qr_no_checkin':
           $where[] = "tk.id IS NOT NULL AND tk.status <> 'checked_in'";
           break;
+        case 'cap_available':
+            $where[] = "tk.id IS NOT NULL AND tk.consumed < tk.capacity";
+            break;
         default:
           // all
           break;
@@ -116,27 +119,33 @@ if (!class_exists('Asetec_Board_API')) {
 
       // ---- Data (LIMIT/OFFSET no necesitan prepare si son enteros casteados)
       $offset = ($page - 1) * $per_page;
-      $sql = "SELECT m.cedula, m.nombre, COALESCE(tk.status,'') AS tk_status
-              FROM $m m
-              $join
-              $where_sql
-              ORDER BY m.nombre ASC
-              LIMIT " . intval($per_page) . " OFFSET " . intval($offset);
-      $sql = asetec_wpdb_prepare_safe($sql, $params);
+      $sql = "SELECT m.cedula, m.nombre,
+                    COALESCE(tk.status,'') AS tk_status,
+                    COALESCE(tk.capacity,0) AS capacity,
+                    COALESCE(tk.consumed,0) AS consumed
+                FROM $m m
+                $join
+                $where_sql
+                ORDER BY m.nombre ASC
+                LIMIT " . intval($per_page) . " OFFSET " . intval($offset);
+
       $rows = $wpdb->get_results($sql, ARRAY_A);
 
       $items = array();
       if ($rows) {
         foreach ($rows as $r) {
           $no_qr   = ($r['tk_status'] === '' || $r['tk_status'] === null);
-          $items[] = array(
+            $items[] = array(
             'cedula'      => $r['cedula'],
             'nombre'      => $r['nombre'],
-            'no_qr'       => $no_qr,
-            'solicito_qr' => !$no_qr,
+            'no_qr'       => ($r['tk_status'] === '' || $r['tk_status'] === null),
+            'solicito_qr' => !($r['tk_status'] === '' || $r['tk_status'] === null),
             'check_in'    => ($r['tk_status'] === 'checked_in'),
             'estado_raw'  => $r['tk_status'],
-          );
+            'capacity'    => intval($r['capacity']),
+            'consumed'    => intval($r['consumed']),
+            );
+
         }
       }
 

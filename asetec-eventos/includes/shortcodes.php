@@ -28,20 +28,24 @@ function asetec_sc_event_board($atts=[]) {
         <option value="qr">Solicitó QR</option>
         <option value="checked_in">Check-in</option>
         <option value="qr_no_checkin">Solicitó, sin Check-in</option>
+        <option value="cap_available">Con cupo disponible</option>
+
       </select>
       <button id="ab-export" class="button">Exportar CSV</button>
     </div>
 
     <table class="widefat fixed striped" id="ab-table">
-      <thead>
-        <tr>
-          <th style="width:140px;">Cédula</th>
-          <th>Nombre</th>
-          <th style="text-align:center;">No solicitó QR</th>
-          <th style="text-align:center;">Solicitó QR</th>
-          <th style="text-align:center;">Check-in</th>
-        </tr>
-      </thead>
+    <thead>
+      <tr>
+        <th style="width:140px;">Cédula</th>
+        <th>Nombre</th>
+        <th style="text-align:center;">No solicitó QR</th>
+        <th style="text-align:center;">Solicitó QR</th>
+        <th style="text-align:center;">Check-in</th>
+        <th style="text-align:center;">Cupo</th>
+      </tr>
+    </thead>
+
       <tbody></tbody>
     </table>
 
@@ -81,13 +85,16 @@ function asetec_sc_event_board($atts=[]) {
           $tbody.innerHTML = '';
           (data.items || []).forEach(it => {
             const tr = document.createElement('tr');
+            const cupo = (it.solicito_qr ? `${it.consumed||0}/${it.capacity||0}` : '–');
             tr.innerHTML = `
               <td>${it.cedula}</td>
               <td>${it.nombre}</td>
               <td style="text-align:center">${mark(it.no_qr)}</td>
               <td style="text-align:center">${mark(it.solicito_qr)}</td>
               <td style="text-align:center">${mark(it.check_in)}</td>
+              <td style="text-align:center">${cupo}</td>
             `;
+
             $tbody.appendChild(tr);
           });
 
