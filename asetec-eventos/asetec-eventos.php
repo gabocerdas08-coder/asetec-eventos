@@ -22,13 +22,19 @@ $files = [
   __DIR__ . '/includes/core/class-members.php',
   __DIR__ . '/admin/class-admin-menu.php',
   __DIR__ . '/includes/shortcodes.php',
+  __DIR__ . '/includes/api/class-board-api.php',   // <-- AÑADIDO: API REST pública
 ];
 
 $missing = array_filter($files, fn($f) => !file_exists($f));
 if ($missing) {
-  asetec_admin_notice('ASETEC Eventos: faltan archivos del módulo. El panel básico permanecerá activo. Archivos faltantes: <code>'.implode('</code>, <code>', array_map(fn($p)=>str_replace(ABSPATH,'',$p),$missing)).'</code>', 'warning');
+  asetec_admin_notice(
+    'ASETEC Eventos: faltan archivos del módulo. El panel básico permanecerá activo. Archivos faltantes: <code>'
+    . implode('</code>, <code>', array_map(fn($p)=>str_replace(ABSPATH,'',$p),$missing))
+    . '</code>', 
+    'warning'
+  );
 
-  // Panel básico (como el que ya te funcionaba)
+  // Panel básico si faltan archivos
   add_action('admin_menu', function(){
     add_menu_page(
       'ASETEC Eventos','ASETEC Eventos','manage_options','asetec-eventos',
@@ -44,19 +50,18 @@ require_once $files[0]; // Activator
 require_once $files[1]; // Events
 require_once $files[2]; // Members (upload CSV)
 require_once $files[3]; // Admin Menu
-require_once $files[4]; // Shortcodes
+require_once $files[4]; // Shortcodes (aquí está [asetec_event_board])
+require_once $files[5]; // <-- Board API (REST)
 
 /** Activación (crea/actualiza tablas) */
 if (class_exists('Asetec_Activator')) {
   register_activation_hook(__FILE__, ['Asetec_Activator','activate']);
 }
 
-
-
 /** Bootstrap */
 add_action('plugins_loaded', function () {
-  // Inicializar handlers de admin-post (members upload)
-  if (class_exists('Asetec_Members')) new Asetec_Members();
-  // Menú y pantallas
-  if (class_exists('Asetec_Admin_Menu')) new Asetec_Admin_Menu();
+  // Inicializar handlers
+  if (class_exists('Asetec_Members'))     new Asetec_Members();
+  if (class_exists('Asetec_Admin_Menu'))  new Asetec_Admin_Menu();
+  if (class_exists('Asetec_Board_API'))   new Asetec_Board_API();   // <-- Inicializa las rutas /wp-json/asetec/v1/...
 });
