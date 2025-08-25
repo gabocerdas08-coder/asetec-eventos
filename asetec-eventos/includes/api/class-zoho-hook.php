@@ -105,7 +105,12 @@ class Asetec_Zoho_Hook {
     $body = json_decode($req->get_body(), true);
     if (!is_array($body)) $body = $req->get_params(); // por si Zoho manda form-encoded
 
-    $event_code = sanitize_text_field(isset($body['event_code']) ? $body['event_code'] : '');
+    $event_code = sanitize_text_field(
+        isset($body['event_code']) && $body['event_code'] !== ''
+            ? $body['event_code']
+            : ($req->get_param('event_code') ?: '')
+        );
+
     if ($event_code === '') {
       return new \WP_Error('bad_request', 'Falta event_code', array('status' => 400));
     }
