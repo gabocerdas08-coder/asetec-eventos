@@ -22,9 +22,6 @@ $files = [
   __DIR__ . '/includes/core/class-members.php',
   __DIR__ . '/admin/class-admin-menu.php',
   __DIR__ . '/includes/shortcodes.php',
-
-
-
 ];
 
 $missing = array_filter($files, fn($f) => !file_exists($f));
