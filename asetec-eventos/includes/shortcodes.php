@@ -15,7 +15,6 @@ function asetec_sc_event_board($atts=[]) {
   $per_page   = max(1, intval($a['per_page']));
   if (!$event_code) return '<em>Falta <code>event_code</code>.</em>';
 
-  // URLs REST
   $list_url   = esc_url_raw( rest_url('asetec/v1/board') );
   $export_url = esc_url_raw( rest_url('asetec/v1/board/export') );
 
@@ -62,10 +61,8 @@ function asetec_sc_event_board($atts=[]) {
     const $pager  = document.getElementById('ab-pager');
     const $export = document.getElementById('ab-export');
 
-    let page = 1;
-    let typingTimer = null;
-
-    function mark(b){ return b ? '✓' : '–'; }
+    let page = 1, typingTimer = null;
+    const mark = b => (b ? '✓' : '–');
 
     function fetchData() {
       const q = $search.value.trim();
@@ -81,7 +78,6 @@ function asetec_sc_event_board($atts=[]) {
       fetch(url.toString())
         .then(r => r.json())
         .then(data => {
-          // Pintar filas
           $tbody.innerHTML = '';
           (data.items || []).forEach(it => {
             const tr = document.createElement('tr');
@@ -95,7 +91,6 @@ function asetec_sc_event_board($atts=[]) {
             $tbody.appendChild(tr);
           });
 
-          // Paginación
           const total = data.total || 0;
           const pages = Math.max(1, Math.ceil(total / PER_PAGE));
           $pager.innerHTML = '';
@@ -107,7 +102,6 @@ function asetec_sc_event_board($atts=[]) {
             $pager.appendChild(btn);
           }
 
-          // Botón export con filtros actuales
           const eurl = new URL(exportURL, window.location.origin);
           eurl.searchParams.set('event_code', EVENT);
           if (q) eurl.searchParams.set('q', q);
@@ -121,14 +115,12 @@ function asetec_sc_event_board($atts=[]) {
         });
     }
 
-    // Eventos
     $status.addEventListener('change', () => { page = 1; fetchData(); });
     $search.addEventListener('input', () => {
       clearTimeout(typingTimer);
       typingTimer = setTimeout(() => { page = 1; fetchData(); }, 250);
     });
 
-    // Primera carga
     fetchData();
   })();
   </script>
