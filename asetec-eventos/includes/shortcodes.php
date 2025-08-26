@@ -138,18 +138,13 @@ add_shortcode('asetec_event_board', 'asetec_sc_event_board');
 
 
 add_shortcode('asetec_checkin', function($atts){
-  if (!is_user_logged_in() || !current_user_can('manage_options')) {
-    return '<div style="padding:12px;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px">Debes iniciar sesión como staff.</div>';
-  }
-
   $a = shortcode_atts(['event_code'=>'' ], $atts);
   if ($a['event_code']==='') {
     return '<div style="padding:12px;background:#f8d7da;border:1px solid #f5c2c7;border-radius:6px">Falta <code>event_code</code> en el shortcode.</div>';
   }
 
-  $nonce  = wp_create_nonce('wp_rest');
-  $api    = esc_url_raw( rest_url('asetec/v1') );
-  $event  = esc_js($a['event_code']);
+  $api   = esc_url_raw( rest_url('asetec/v1') );
+  $event = esc_js($a['event_code']);
 
   ob_start(); ?>
   <div id="asetec-ci" style="max-width:980px;margin:12px auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
@@ -205,7 +200,6 @@ add_shortcode('asetec_checkin', function($atts){
   <script>
   (function(){
     const API   = "<?php echo esc_js($api); ?>";
-    const NONCE = "<?php echo esc_js($nonce); ?>";
     const EVENT = "<?php echo esc_js($event); ?>";
 
     // Tabs
@@ -234,56 +228,84 @@ add_shortcode('asetec_checkin', function($atts){
     const $cedBtn = document.getElementById('ci-ced-lookup');
     const $cedRes = document.getElementById('ci-ced-result');
 
-    // Token helpers
     function extractToken(text){
       try { const u=new URL(text); const tid=u.searchParams.get('tid'); if(tid) return tid; } catch(e){}
       return (text||'').trim();
     }
     function beepOK(){ try{ new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAABAA==').play(); }catch(e){} }
 
-    // ====== QR cámara ======
+    // ====== Cámara: solicitar permiso y listar ======
     let scanner = null;
+
+    async function requestCamPermission(){
+      // Algunos navegadores no listan cámaras hasta que se pide getUserMedia
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(t => t.stop());
+      } catch(e) {
+        // Ignoramos; el botón Iniciar volverá a pedir permiso
+      }
+    }
+
     async function listCams(){
       try{
+        await requestCamPermission();
         const cams = await Html5Qrcode.getCameras();
         $camSel.innerHTML = '';
+        if (!cams || !cams.length) {
+          $camSel.innerHTML = '<option>No hay cámaras</option>';
+          $status.textContent = 'No se detectaron cámaras. Revisa permisos del navegador y HTTPS.';
+          return;
+        }
         cams.forEach((c,i)=>{
           const opt=document.createElement('option');
           opt.value=c.id; opt.textContent=c.label || ('Cámara '+(i+1));
           $camSel.appendChild(opt);
         });
-        // auto-selección: si móvil intenta cámara trasera
+        // móvil: priorizar trasera si se identifica
         if (/Mobi|Android/i.test(navigator.userAgent) && cams.length>1) {
-          const back = cams.find(c => /back|trasera|rear/i.test(c.label));
+          const back = cams.find(c => /back|rear|trasera/i.test(c.label));
           if (back) $camSel.value = back.id;
         }
+        $status.textContent = 'Selecciona una cámara y presiona Iniciar.';
       }catch(e){
-        $camSel.innerHTML = '<option>No hay cámaras</option>';
+        $camSel.innerHTML = '<option>Error listando cámaras</option>';
+        $status.textContent = 'Error listando cámaras. Asegúrate de usar HTTPS y otorgar permisos.';
       }
     }
+
     async function startCam(){
       if (scanner) return;
       scanner = new Html5Qrcode("qr-reader");
-      const camId = $camSel.value;
       $status.textContent = 'Iniciando cámara…';
       try{
-        await scanner.start(
-          { deviceId: { exact: camId } },
-          { fps: 10, qrbox: 250 },
-          onScanSuccess,
-          onScanFailure
-        );
+        if ($camSel.value) {
+          await scanner.start(
+            { deviceId: { exact: $camSel.value } },
+            { fps: 10, qrbox: 250 },
+            onScanSuccess, onScanFailure
+          );
+        } else {
+          // fallback: facingMode environment (móvil)
+          await scanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            onScanSuccess, onScanFailure
+          );
+        }
         $status.textContent = 'Cámara activa';
       }catch(e){
-        $status.textContent = 'No se pudo iniciar la cámara';
+        $status.textContent = 'No se pudo iniciar la cámara. Revisa permisos y que no esté en uso por otra app.';
       }
     }
+
     async function stopCam(){
       if (!scanner) return;
       try{ await scanner.stop(); scanner.clear(); }catch(e){}
       scanner = null;
       $status.textContent = 'Cámara detenida';
     }
+
     function onScanSuccess(decodedText){
       const tok = extractToken(decodedText);
       $token.value = tok;
@@ -293,16 +315,20 @@ add_shortcode('asetec_checkin', function($atts){
     }
     function onScanFailure(err){ /* silencio */ }
 
+    document.addEventListener('visibilitychange', ()=> {
+      if (document.hidden) stopCam();
+    });
+
     $camStart.onclick = startCam;
     $camStop.onclick  = stopCam;
-    listCams(); // cargar lista al abrir
+    listCams();
 
     // ====== Lookup por token (QR o lector USB) ======
     async function doLookup(tok){
       if (!tok) { $res.innerHTML='<em>Token vacío</em>'; return; }
       $res.innerHTML = '<em>Buscando…</em>';
       const url = `${API}/checkin/lookup?event_code=${encodeURIComponent(EVENT)}&token=${encodeURIComponent(tok)}`;
-      const r = await fetch(url, { credentials:'same-origin' });
+      const r = await fetch(url);
       const j = await r.json();
       if (!r.ok) { $res.innerHTML = `<div style="color:#b00020">Error: ${j.message||'No encontrado'}</div>`; return; }
       const t=j.ticket, rem=j.remaining;
@@ -319,17 +345,13 @@ add_shortcode('asetec_checkin', function($atts){
     async function doConfirm(ident){
       const qty = Math.max(1, parseInt(($qty.value||$qty2.value||1)));
       const r = await fetch(`${API}/checkin`, {
-        method:'POST', credentials:'same-origin',
-        headers:{ 'Content-Type':'application/json','X-WP-Nonce':NONCE },
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify(Object.assign({ event_code: EVENT, qty }, ident))
       });
       const j = await r.json();
-      if (!r.ok) {
-        const box = panes.qr.style.display!=='none' ? $res : $cedRes;
-        box.innerHTML = `<div style="color:#b00020"><strong>Error:</strong> ${j.message||'No se pudo registrar'}</div>`;
-        return;
-      }
       const box = panes.qr.style.display!=='none' ? $res : $cedRes;
+      if (!r.ok) { box.innerHTML = `<div style="color:#b00020"><strong>Error:</strong> ${j.message||'No se pudo registrar'}</div>`; return; }
       box.innerHTML = `
         <div style="color:#0a7f2e"><strong>${j.message}</strong></div>
         <div><strong>Entrada:</strong> #${j.ticket.entry_number}</div>
@@ -347,7 +369,7 @@ add_shortcode('asetec_checkin', function($atts){
       if (!ced) { $cedRes.innerHTML='<em>Ingresa una cédula</em>'; return; }
       $cedRes.innerHTML = '<em>Buscando…</em>';
       const url = `${API}/checkin/lookup-by-cedula?event_code=${encodeURIComponent(EVENT)}&cedula=${encodeURIComponent(ced)}`;
-      const r = await fetch(url, { credentials:'same-origin' });
+      const r = await fetch(url);
       const j = await r.json();
       if (!r.ok) { $cedRes.innerHTML = `<div style="color:#b00020">Error: ${j.message||'No encontrado'}</div>`; return; }
       const t=j.ticket, rem=j.remaining;
@@ -365,10 +387,11 @@ add_shortcode('asetec_checkin', function($atts){
     $cedBtn.onclick = doLookupCed;
     $ced.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); doLookupCed(); } });
 
-    // Si es móvil, intenta iniciar cámara al abrir la pestaña QR
+    // En móvil intenta arrancar trasera al abrir la pestaña QR (cumple gesto al presionar "Iniciar")
     if (/Mobi|Android/i.test(navigator.userAgent)) {
-      // pequeño delay para que cargue la lista
-      setTimeout(()=>{ if (!$camSel.value) listCams(); startCam(); }, 400);
+      setTimeout(()=>{ if (!$camSel.value) listCams(); }, 400);
+    } else {
+      listCams();
     }
   })();
   </script>

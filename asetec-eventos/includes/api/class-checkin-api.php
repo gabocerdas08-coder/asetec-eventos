@@ -7,24 +7,30 @@ class Asetec_Checkin_API {
 
   public function routes() {
     register_rest_route('asetec/v1', '/checkin/lookup', [
-      'methods'=>'GET','callback'=>[$this,'lookup'],'permission_callback'=>[$this,'perm'],
-      'args'=>['event_code'=>['required'=>true], 'token'=>['required'=>true]]
+      'methods'  => 'GET',
+      'callback' => [$this,'lookup'],
+      'permission_callback' => '__return_true',
+      'args' => [
+        'event_code' => ['required' => true],
+        'token'      => ['required' => true],
+      ],
     ]);
 
-    // NUEVO: lookup por cédula
     register_rest_route('asetec/v1', '/checkin/lookup-by-cedula', [
-      'methods'=>'GET','callback'=>[$this,'lookup_by_cedula'],'permission_callback'=>[$this,'perm'],
-      'args'=>['event_code'=>['required'=>true], 'cedula'=>['required'=>true]]
+      'methods'  => 'GET',
+      'callback' => [$this,'lookup_by_cedula'],
+      'permission_callback' => '__return_true',
+      'args' => [
+        'event_code' => ['required' => true],
+        'cedula'     => ['required' => true],
+      ],
     ]);
 
-    // Confirmar: ahora acepta token O ticket_id
     register_rest_route('asetec/v1', '/checkin', [
-      'methods'=>'POST','callback'=>[$this,'confirm'],'permission_callback'=>[$this,'perm'],
+      'methods'  => 'POST',
+      'callback' => [$this,'confirm'],
+      'permission_callback' => '__return_true',
     ]);
-  }
-
-  public function perm() {
-    return is_user_logged_in() && current_user_can('manage_options');
   }
 
   private function get_event($code){
@@ -35,10 +41,12 @@ class Asetec_Checkin_API {
     );
   }
 
+  /** GET /checkin/lookup?event_code=XXX&token=YYY */
   public function lookup(\WP_REST_Request $req) {
     global $wpdb;
     $event_code = sanitize_text_field($req->get_param('event_code'));
     $token      = sanitize_text_field($req->get_param('token'));
+
     $ev = $this->get_event($event_code);
     if (!$ev) return new \WP_Error('not_found','Evento no encontrado', ['status'=>404]);
 
@@ -62,11 +70,12 @@ class Asetec_Checkin_API {
     ];
   }
 
-  // NUEVO: buscar por cédula (1 ticket por evento)
+  /** GET /checkin/lookup-by-cedula?event_code=XXX&cedula=NNN */
   public function lookup_by_cedula(\WP_REST_Request $req) {
     global $wpdb;
     $event_code = sanitize_text_field($req->get_param('event_code'));
     $cedula     = sanitize_text_field($req->get_param('cedula'));
+
     $ev = $this->get_event($event_code);
     if (!$ev) return new \WP_Error('not_found','Evento no encontrado', ['status'=>404]);
 
@@ -81,7 +90,7 @@ class Asetec_Checkin_API {
     return [
       'event'=>['id'=>(int)$ev['id'],'code'=>$ev['code'],'name'=>$ev['name']],
       'ticket'=>[
-        'id'=>(int)$tk['id'], 'token'=>$tk['token'],
+        'id'=>(int)$tk['id'],'token'=>$tk['token'],
         'entry_number'=>(int)$tk['entry_number'],
         'cedula'=>$tk['cedula'],'nombre'=>$tk['nombre'],'email'=>$tk['email'],
         'capacity'=>(int)$tk['capacity'],'consumed'=>(int)$tk['consumed'],'status'=>$tk['status'],
@@ -90,10 +99,11 @@ class Asetec_Checkin_API {
     ];
   }
 
-  // POST /checkin  Body: {event_code, qty, token? , ticket_id?}
+  /** POST /checkin  Body: {event_code, qty, token? , ticket_id?} */
   public function confirm(\WP_REST_Request $req) {
     global $wpdb;
     $p = $req->get_json_params(); if (!is_array($p)) $p=$req->get_params();
+
     $event_code = sanitize_text_field($p['event_code'] ?? '');
     $qty        = max(1, intval($p['qty'] ?? 1));
     $token      = isset($p['token']) ? sanitize_text_field($p['token']) : '';
@@ -130,7 +140,6 @@ class Asetec_Checkin_API {
     $new_consumed = (int)$tk['consumed'] + $qty;
     $new_status   = ($new_consumed >= (int)$tk['capacity']) ? 'checked_in' : $tk['status'];
 
-    // update atómico
     $updated = $wpdb->query($wpdb->prepare(
       "UPDATE $t SET consumed=%d, status=%s, checked_in_at=%s, updated_at=%s
        WHERE id=%d AND consumed=%d",
