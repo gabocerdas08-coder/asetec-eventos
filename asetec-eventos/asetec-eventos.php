@@ -40,6 +40,7 @@ $files = array(
   ASETEC_EVT_INC . '/shortcodes.php',
   ASETEC_EVT_INC . '/api/class-board-api.php', // API REST pública (para la tabla)
   ASETEC_EVT_INC . '/api/class-zoho-hook.php',      // Integración Zoho 
+  ASETEC_EVT_INC . '/services/class-qr-email.php',  // QR + email
 );
 
 /** Requerir y recolectar faltantes */

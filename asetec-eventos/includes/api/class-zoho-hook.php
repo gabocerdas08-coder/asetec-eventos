@@ -207,6 +207,28 @@ class Asetec_Zoho_Hook {
 
       $ticket_id = (int)$wpdb->insert_id;
     }
+        // === AQUI EMPIEZA 2B: generar QR + enviar correo ===
+    $ticket_data = [
+      'entry_number' => $entry_number,
+      'token'        => $token,
+      'cedula'       => $cedula,
+      'nombre'       => $nombre_full,
+      'email'        => $email,
+      'capacity'     => (int)$capacity,
+    ];
+
+    $event_data = [
+      'id'   => (int)$ev['id'],
+      'code' => $ev['code'],
+      'name' => $ev['name'],
+    ];
+
+    // 1) Generar QR
+    $qr = Asetec_QR_Email::generate_qr_png($token, $ev['code']);
+
+    // 2) Enviar correo
+    $sent = Asetec_QR_Email::send_ticket_email($ticket_data, $event_data, $qr);
+    // === AQUI TERMINA 2B ===
 
     return array(
       'ok'           => true,
@@ -217,7 +239,10 @@ class Asetec_Zoho_Hook {
       'nombre'       => $nombre_full,
       'email'        => $email,
       'capacity'     => (int)$capacity,
-      'message'      => 'Ticket creado/actualizado (Módulo 2A). QR y correo siguen en 2B.',
+      'qr'           => is_wp_error($qr) ? 'error' : 'ok',
+      'email_sent'   => is_wp_error($sent) ? 'error' : 'ok',
+      'message'      => 'Ticket creado/actualizado y correo enviado.',
     );
+
   }
 }
