@@ -135,3 +135,145 @@ function asetec_sc_event_board($atts=[]) {
   return ob_get_clean();
 }
 add_shortcode('asetec_event_board', 'asetec_sc_event_board');
+add_shortcode('asetec_checkin', function($atts){
+  if (!is_user_logged_in() || !current_user_can('manage_options')) {
+    return '<div style="padding:12px;background:#fff3cd;border:1px solid #ffeeba;border-radius:6px">Debes iniciar sesión como staff.</div>';
+  }
+
+  $a = shortcode_atts(array(
+    'event_code' => '',
+  ), $atts);
+
+  if ($a['event_code']==='') {
+    return '<div style="padding:12px;background:#f8d7da;border:1px solid #f5c2c7;border-radius:6px">Falta <code>event_code</code> en el shortcode.</div>';
+  }
+
+  // Nonce REST para llamadas autenticadas
+  $nonce = wp_create_nonce('wp_rest');
+  $apiBase = esc_url_raw( rest_url('asetec/v1') );
+  $event  = esc_js($a['event_code']);
+
+  ob_start(); ?>
+  <div id="asetec-checkin" style="max-width:900px;margin:12px auto;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif">
+    <h2 style="margin:0 0 12px">Check-in — Evento <strong><?php echo esc_html($event); ?></strong></h2>
+
+    <div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div style="flex:1;min-width:280px">
+        <div id="camera" style="border:1px solid #ddd;border-radius:8px;padding:8px">
+          <div id="qr-reader" style="width:100%"></div>
+          <div id="qr-status" style="margin-top:8px;color:#666;font-size:12px"></div>
+        </div>
+        <p style="margin:10px 0;text-align:center;color:#666">o ingresa el código manual:</p>
+        <div style="display:flex;gap:8px">
+          <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
+          <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
+          <button id="ci-lookup" class="button button-primary">Buscar</button>
+        </div>
+      </div>
+
+      <div style="flex:1;min-width:280px">
+        <div id="ci-result" style="border:1px solid #ddd;border-radius:8px;padding:12px;min-height:180px">
+          <em>Escanea un QR o ingresa un token para ver el ticket…</em>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Librería de cámara/QR: html5-qrcode (CDN) -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  <script>
+  (function(){
+    const API   = "<?php echo esc_js($apiBase); ?>";
+    const NONCE = "<?php echo esc_js($nonce); ?>";
+    const EVENT = "<?php echo esc_js($event); ?>";
+
+    const $token  = document.getElementById('ci-token');
+    const $qty    = document.getElementById('ci-qty');
+    const $lookup = document.getElementById('ci-lookup');
+    const $res    = document.getElementById('ci-result');
+    const $status = document.getElementById('qr-status');
+
+    function extractToken(text){
+      try {
+        const u = new URL(text);
+        const tid = u.searchParams.get('tid');
+        if (tid) return tid;
+      } catch(e){}
+      return text.trim();
+    }
+
+    async function doLookup(tok){
+      $res.innerHTML = '<em>Buscando…</em>';
+      const url = `${API}/checkin/lookup?event_code=${encodeURIComponent(EVENT)}&token=${encodeURIComponent(tok)}`;
+      const r = await fetch(url, { credentials:'same-origin' });
+      const j = await r.json();
+      if (!r.ok) {
+        $res.innerHTML = `<div style="color:#b00020">Error: ${j.message || 'No encontrado'}</div>`;
+        return null;
+      }
+      const t = j.ticket, rem = j.remaining;
+      $res.innerHTML = `
+        <div><strong>Entrada:</strong> #${t.entry_number}</div>
+        <div><strong>Asociado:</strong> ${t.nombre} — cédula ${t.cedula}</div>
+        <div><strong>Cupo:</strong> ${t.consumed}/${t.capacity} &nbsp; <small>${rem} restantes</small></div>
+        <div style="margin-top:10px">
+          <button id="ci-confirm" class="button button-primary">Confirmar ingreso (${Math.max(1, parseInt($qty.value||1))})</button>
+        </div>
+      `;
+      document.getElementById('ci-confirm').onclick = () => doConfirm(tok);
+      return j;
+    }
+
+    async function doConfirm(tok){
+      const qty = Math.max(1, parseInt($qty.value||1));
+      const r = await fetch(`${API}/checkin`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': NONCE
+        },
+        body: JSON.stringify({ event_code: EVENT, token: tok, qty })
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        $res.innerHTML = `<div style="color:#b00020"><strong>Error:</strong> ${j.message || 'No se pudo registrar'}</div>`;
+        return;
+      }
+      $res.innerHTML = `
+        <div style="color:#0a7f2e"><strong>${j.message}</strong></div>
+        <div><strong>Entrada:</strong> #${j.ticket.entry_number}</div>
+        <div><strong>Asociado:</strong> ${j.ticket.nombre} — cédula ${j.ticket.cedula}</div>
+        <div><strong>Cupo:</strong> ${j.ticket.consumed}/${j.ticket.capacity} &nbsp; <small>${j.remaining} restantes</small></div>
+      `;
+      // beep opcional
+      try { new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAABAA==').play(); } catch(e){}
+    }
+
+    $lookup.addEventListener('click', () => {
+      const tok = extractToken($token.value);
+      if (!tok) { alert('Ingresa un token'); return; }
+      doLookup(tok);
+    });
+
+    // Cámara
+    const divId = "qr-reader";
+    function onScanSuccess(decodedText) {
+      const tok = extractToken(decodedText);
+      $token.value = tok;
+      $status.textContent = 'QR leído: ' + tok.slice(0,16) + '…';
+      doLookup(tok);
+    }
+    function onScanFailure(err){ /* silencioso */ }
+
+    if (window.Html5QrcodeScanner) {
+      const scanner = new Html5QrcodeScanner(divId, { fps: 10, qrbox: 250 }, false);
+      scanner.render(onScanSuccess, onScanFailure);
+    } else {
+      document.getElementById(divId).innerHTML = '<em>No se pudo cargar el lector de QR.</em>';
+    }
+  })();
+  </script>
+  <?php
+  return ob_get_clean();
+});

@@ -41,6 +41,7 @@ $files = array(
   ASETEC_EVT_INC . '/api/class-board-api.php', // API REST pública (para la tabla)
   ASETEC_EVT_INC . '/api/class-zoho-hook.php',      // Integración Zoho 
   ASETEC_EVT_INC . '/services/class-qr-email.php',  // QR + email
+  ASETEC_EVT_INC . '/api/class-checkin-api.php', // API REST para check-in (staff)
 );
 
 /** Requerir y recolectar faltantes */
@@ -78,4 +79,5 @@ add_action('plugins_loaded', function () {
   if (class_exists('Asetec_Admin_Menu'))  { new Asetec_Admin_Menu(); }
   if (class_exists('Asetec_Board_API'))   { new Asetec_Board_API(); } // /wp-json/asetec/v1/...
   if (class_exists('Asetec_Zoho_Hook')) { new Asetec_Zoho_Hook(); }
+  if (class_exists('Asetec_Checkin_API')) {new Asetec_Checkin_API();}
 });

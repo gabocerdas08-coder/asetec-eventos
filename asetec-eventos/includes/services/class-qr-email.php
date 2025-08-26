@@ -67,9 +67,6 @@ class Asetec_QR_Email {
     $html .= sprintf('<li><strong>Válido para:</strong> %s</li>', esc_html($capT));
     $html .= '</ul>';
     $html .= '<p style="margin:12px 0">Presenta este QR en el ingreso. Si traes acompañantes, deben ingresar junto contigo.</p>';
-    $html .= sprintf('<p style="margin:12px 0"><a href="%s" target="_blank">Ver ticket</a></p>',
-      esc_url(add_query_arg(['tid' => $ticket['token']], home_url('/asetec/ticket')))
-    );
     $html .= '<hr style="margin:16px 0;border:none;border-top:1px solid #ddd">';
     $html .= '<p style="color:#666;margin:0">Este correo fue generado automáticamente por ASETEC.</p>';
     $html .= '</div>';
