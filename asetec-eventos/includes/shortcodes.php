@@ -196,6 +196,7 @@ add_shortcode('asetec_checkin', function($atts){
     </div>
   </div>
 
+  
 
   <script>
 (function whenZXingReady(cb){
@@ -403,6 +404,62 @@ add_shortcode('asetec_checkin', function($atts){
   }
 });
 </script>
+  <?php
+  return ob_get_clean();
+});
+
+add_shortcode('asetec_ticket_view', function() {
+  $token = isset($_GET['tid']) ? sanitize_text_field($_GET['tid']) : '';
+  if (!$token) return '<div style="color:#b00020">No se encontró el token en la URL.</div>';
+
+  $api = esc_url_raw(rest_url('asetec/v1'));
+  ob_start(); ?>
+  <div id="asetec-ticket-view">
+    <div id="ticket-info"><em>Cargando información del ticket…</em></div>
+  </div>
+  <script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const token = <?php echo json_encode($token); ?>;
+    const api = <?php echo json_encode($api); ?>;
+    const $info = document.getElementById('ticket-info');
+    fetch(`${api}/checkin/lookup?token=${encodeURIComponent(token)}`)
+      .then(r => r.json())
+      .then(j => {
+        if (!j.ticket) {
+          $info.innerHTML = '<div style="color:#b00020">No se encontró el ticket.</div>';
+          return;
+        }
+        const t = j.ticket;
+        $info.innerHTML = `
+          <div><strong>Nombre:</strong> ${t.nombre}</div>
+          <div><strong>Cédula:</strong> ${t.cedula}</div>
+          <div><strong>Entrada:</strong> #${t.entry_number}</div>
+          <div><strong>Cupo:</strong> ${t.consumed}/${t.capacity}</div>
+          <div style="margin-top:10px">
+            <button id="ticket-checkin" class="button button-primary">Registrar ingreso</button>
+          </div>
+        `;
+        document.getElementById('ticket-checkin').onclick = function() {
+          fetch(`${api}/checkin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: token, event_code: t.event_code, qty: 1 })
+          })
+          .then(r => r.json())
+          .then(res => {
+            if (res.ticket) {
+              $info.innerHTML += `<div style="color:#0a7f2e;margin-top:10px"><strong>${res.message}</strong></div>`;
+            } else {
+              $info.innerHTML += `<div style="color:#b00020;margin-top:10px"><strong>${res.message||'Error al registrar ingreso'}</strong></div>`;
+            }
+          });
+        };
+      })
+      .catch(() => {
+        $info.innerHTML = '<div style="color:#b00020">Error al consultar el ticket.</div>';
+      });
+  });
+  </script>
   <?php
   return ob_get_clean();
 });
