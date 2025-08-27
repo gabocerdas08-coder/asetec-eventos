@@ -81,3 +81,14 @@ add_action('plugins_loaded', function () {
   if (class_exists('Asetec_Zoho_Hook')) { new Asetec_Zoho_Hook(); }
   if (class_exists('Asetec_Checkin_API')) {new Asetec_Checkin_API();}
 });
+
+
+add_action('wp_enqueue_scripts', function() {
+    wp_enqueue_script(
+        'zxing',
+        'https://unpkg.com/@zxing/browser@0.1.4/umd/index.min.js',
+        [],
+        null,
+        true // Cargar al final del body
+    );
+});

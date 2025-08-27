@@ -196,7 +196,7 @@ add_shortcode('asetec_checkin', function($atts){
     </div>
   </div>
 
-  <script src="https://unpkg.com/@zxing/browser@0.1.4/umd/index.min.js"></script>
+
   <script>
   (function(){
     const API   = "<?php echo esc_js($api); ?>";
