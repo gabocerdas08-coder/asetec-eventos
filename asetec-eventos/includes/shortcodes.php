@@ -249,7 +249,7 @@ async function requestCamPermission(){
 
 async function listCams(){
   try{
-    await requestCamPermission();
+    // Elimina requestCamPermission(); ZXing pedirá permisos si es necesario
     const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
     $camSel.innerHTML = '';
     if (!devices || !devices.length) {
@@ -265,10 +265,10 @@ async function listCams(){
     $status.textContent = 'Selecciona una cámara y presiona Iniciar.';
   }catch(e){
     $camSel.innerHTML = '<option>Error listando cámaras</option>';
-    $status.textContent = 'Error listando cámaras. Asegúrate de usar HTTPS y otorgar permisos.';
+    $status.textContent = 'Error listando cámaras: ' + (e && e.message ? e.message : e);
+    console.error('Error listando cámaras', e);
   }
 }
-
 
 async function startCam(){
   if (scanner) return;
