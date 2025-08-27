@@ -269,37 +269,53 @@ async function listCams(){
   }
 }
 
-    async function startCam(){
-      if (scanner) return;
-      scanner = new Html5Qrcode("qr-reader");
-      $status.textContent = 'Iniciando cámara…';
-      try{
-        if ($camSel.value) {
-          await scanner.start(
-            { deviceId: { exact: $camSel.value } },
-            { fps: 10, qrbox: 250 },
-            onScanSuccess, onScanFailure
-          );
-        } else {
-          // fallback: facingMode environment (móvil)
-          await scanner.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: 250 },
-            onScanSuccess, onScanFailure
-          );
-        }
-        $status.textContent = 'Cámara activa';
-      }catch(e){
-        $status.textContent = 'No se pudo iniciar la cámara. Revisa permisos y que no esté en uso por otra app.';
-      }
-    }
+let scanner = null;
+let scanStop = null;
 
-    async function stopCam(){
-      if (!scanner) return;
-      try{ await scanner.stop(); scanner.clear(); }catch(e){}
-      scanner = null;
-      $status.textContent = 'Cámara detenida';
-    }
+async function startCam(){
+  if (scanner) return;
+  if (!$camSel.value) {
+    $status.textContent = 'Selecciona una cámara.';
+    return;
+  }
+  $status.textContent = 'Iniciando cámara…';
+  scanner = new ZXing.BrowserMultiFormatReader();
+  try {
+    const previewElem = document.createElement('video');
+    previewElem.style.width = '100%';
+    previewElem.style.maxHeight = '260px';
+    $qrBox.innerHTML = '';
+    $qrBox.appendChild(previewElem);
+
+    scanStop = await scanner.decodeFromVideoDevice(
+      $camSel.value,
+      previewElem,
+      (result, err, controls) => {
+        if (result) {
+          onScanSuccess(result.getText());
+          controls.stop();
+          scanStop = null;
+          scanner = null;
+        }
+      }
+    );
+    $status.textContent = 'Cámara activa';
+  } catch(e) {
+    $status.textContent = 'No se pudo iniciar la cámara. Revisa permisos y que no esté en uso por otra app.';
+    scanner = null;
+    scanStop = null;
+  }
+}
+
+async function stopCam(){
+  if (scanner && scanStop) {
+    try { scanStop(); } catch(e){}
+    scanner = null;
+    scanStop = null;
+  }
+  $qrBox.innerHTML = '';
+  $status.textContent = 'Cámara detenida';
+}
 
     function onScanSuccess(decodedText){
       const tok = extractToken(decodedText);
