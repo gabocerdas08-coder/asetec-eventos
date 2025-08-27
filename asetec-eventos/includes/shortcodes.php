@@ -395,7 +395,12 @@ add_shortcode('asetec_checkin', function($atts){
     }
     $cedBtn.onclick = doLookupCed;
     $ced.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); doLookupCed(); } });
-  });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', asetecCheckinInit);
+  } else {
+    asetecCheckinInit();
+  }
 });
 </script>
   <?php
