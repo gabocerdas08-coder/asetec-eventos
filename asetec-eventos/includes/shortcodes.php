@@ -197,8 +197,12 @@ add_shortcode('asetec_checkin', function($atts){
   </div>
 
 
-  <script>
-  (function(){
+<?php
+<script>
+(function whenZXingReady(cb){
+  if (window.ZXing && window.ZXing.BrowserCodeReader) cb();
+  else setTimeout(()=>whenZXingReady(cb), 50);
+})(function(){
     const API   = "<?php echo esc_js($api); ?>";
     const EVENT = "<?php echo esc_js($event); ?>";
 
@@ -235,85 +239,75 @@ add_shortcode('asetec_checkin', function($atts){
     function beepOK(){ try{ new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAABAA==').play(); }catch(e){} }
 
     // ====== Cámara: solicitar permiso y listar ======
-let scanner = null;
-let scanStop = null;
+    let scanner = null;
+    let scanStop = null;
 
-async function requestCamPermission(){
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    stream.getTracks().forEach(t => t.stop());
-  } catch(e) {
-    // Ignoramos; el botón Iniciar volverá a pedir permiso
-  }
-}
-
-async function listCams(){
-  try{
-    // Elimina requestCamPermission(); ZXing pedirá permisos si es necesario
-    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-    $camSel.innerHTML = '';
-    if (!devices || !devices.length) {
-      $camSel.innerHTML = '<option>No hay cámaras</option>';
-      $status.textContent = 'No se detectaron cámaras. Revisa permisos del navegador y HTTPS.';
-      return;
-    }
-    devices.forEach((c,i)=>{
-      const opt=document.createElement('option');
-      opt.value=c.deviceId; opt.textContent=c.label || ('Cámara '+(i+1));
-      $camSel.appendChild(opt);
-    });
-    $status.textContent = 'Selecciona una cámara y presiona Iniciar.';
-  }catch(e){
-    $camSel.innerHTML = '<option>Error listando cámaras</option>';
-    $status.textContent = 'Error listando cámaras: ' + (e && e.message ? e.message : e);
-    console.error('Error listando cámaras', e);
-  }
-}
-
-async function startCam(){
-  if (scanner) return;
-  if (!$camSel.value) {
-    $status.textContent = 'Selecciona una cámara.';
-    return;
-  }
-  $status.textContent = 'Iniciando cámara…';
-  scanner = new ZXing.BrowserMultiFormatReader();
-  try {
-    const previewElem = document.createElement('video');
-    previewElem.style.width = '100%';
-    previewElem.style.maxHeight = '260px';
-    $qrBox.innerHTML = '';
-    $qrBox.appendChild(previewElem);
-
-    scanStop = await scanner.decodeFromVideoDevice(
-      $camSel.value,
-      previewElem,
-      (result, err, controls) => {
-        if (result) {
-          onScanSuccess(result.getText());
-          controls.stop();
-          scanStop = null;
-          scanner = null;
+    async function listCams(){
+      try{
+        const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+        $camSel.innerHTML = '';
+        if (!devices || !devices.length) {
+          $camSel.innerHTML = '<option>No hay cámaras</option>';
+          $status.textContent = 'No se detectaron cámaras. Revisa permisos del navegador y HTTPS.';
+          return;
         }
+        devices.forEach((c,i)=>{
+          const opt=document.createElement('option');
+          opt.value=c.deviceId; opt.textContent=c.label || ('Cámara '+(i+1));
+          $camSel.appendChild(opt);
+        });
+        $status.textContent = 'Selecciona una cámara y presiona Iniciar.';
+      }catch(e){
+        $camSel.innerHTML = '<option>Error listando cámaras</option>';
+        $status.textContent = 'Error listando cámaras: ' + (e && e.message ? e.message : e);
+        console.error('Error listando cámaras', e);
       }
-    );
-    $status.textContent = 'Cámara activa';
-  } catch(e) {
-    $status.textContent = 'No se pudo iniciar la cámara. Revisa permisos y que no esté en uso por otra app.';
-    scanner = null;
-    scanStop = null;
-  }
-}
+    }
 
-async function stopCam(){
-  if (scanner && scanStop) {
-    try { scanStop(); } catch(e){}
-    scanner = null;
-    scanStop = null;
-  }
-  $qrBox.innerHTML = '';
-  $status.textContent = 'Cámara detenida';
-}
+    async function startCam(){
+      if (scanner) return;
+      if (!$camSel.value) {
+        $status.textContent = 'Selecciona una cámara.';
+        return;
+      }
+      $status.textContent = 'Iniciando cámara…';
+      scanner = new ZXing.BrowserMultiFormatReader();
+      try {
+        const previewElem = document.createElement('video');
+        previewElem.style.width = '100%';
+        previewElem.style.maxHeight = '260px';
+        $qrBox.innerHTML = '';
+        $qrBox.appendChild(previewElem);
+
+        scanStop = await scanner.decodeFromVideoDevice(
+          $camSel.value,
+          previewElem,
+          (result, err, controls) => {
+            if (result) {
+              onScanSuccess(result.getText());
+              controls.stop();
+              scanStop = null;
+              scanner = null;
+            }
+          }
+        );
+        $status.textContent = 'Cámara activa';
+      } catch(e) {
+        $status.textContent = 'No se pudo iniciar la cámara. Revisa permisos y que no esté en uso por otra app.';
+        scanner = null;
+        scanStop = null;
+      }
+    }
+
+    async function stopCam(){
+      if (scanner && scanStop) {
+        try { scanStop(); } catch(e){}
+        scanner = null;
+        scanStop = null;
+      }
+      $qrBox.innerHTML = '';
+      $status.textContent = 'Cámara detenida';
+    }
 
     function onScanSuccess(decodedText){
       const tok = extractToken(decodedText);
@@ -322,7 +316,6 @@ async function stopCam(){
       doLookup(tok);
       beepOK();
     }
-    function onScanFailure(err){ /* silencio */ }
 
     document.addEventListener('visibilitychange', ()=> {
       if (document.hidden) stopCam();
@@ -330,7 +323,13 @@ async function stopCam(){
 
     $camStart.onclick = startCam;
     $camStop.onclick  = stopCam;
-    listCams();
+
+    // En móvil intenta arrancar trasera al abrir la pestaña QR (cumple gesto al presionar "Iniciar")
+    if (/Mobi|Android/i.test(navigator.userAgent)) {
+      setTimeout(()=>{ if (!$camSel.value) listCams(); }, 400);
+    } else {
+      listCams();
+    }
 
     // ====== Lookup por token (QR o lector USB) ======
     async function doLookup(tok){
@@ -395,15 +394,8 @@ async function stopCam(){
     }
     $cedBtn.onclick = doLookupCed;
     $ced.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); doLookupCed(); } });
-
-    // En móvil intenta arrancar trasera al abrir la pestaña QR (cumple gesto al presionar "Iniciar")
-    if (/Mobi|Android/i.test(navigator.userAgent)) {
-      setTimeout(()=>{ if (!$camSel.value) listCams(); }, 400);
-    } else {
-      listCams();
-    }
-  })();
-  </script>
+});
+</script>
   <?php
   return ob_get_clean();
 });
