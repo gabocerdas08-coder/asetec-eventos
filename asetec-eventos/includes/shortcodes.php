@@ -247,32 +247,27 @@ add_shortcode('asetec_checkin', function($atts){
       }
     }
 
-    async function listCams(){
-      try{
-        await requestCamPermission();
-        const cams = await Html5Qrcode.getCameras();
-        $camSel.innerHTML = '';
-        if (!cams || !cams.length) {
-          $camSel.innerHTML = '<option>No hay cámaras</option>';
-          $status.textContent = 'No se detectaron cámaras. Revisa permisos del navegador y HTTPS.';
-          return;
-        }
-        cams.forEach((c,i)=>{
-          const opt=document.createElement('option');
-          opt.value=c.id; opt.textContent=c.label || ('Cámara '+(i+1));
-          $camSel.appendChild(opt);
-        });
-        // móvil: priorizar trasera si se identifica
-        if (/Mobi|Android/i.test(navigator.userAgent) && cams.length>1) {
-          const back = cams.find(c => /back|rear|trasera/i.test(c.label));
-          if (back) $camSel.value = back.id;
-        }
-        $status.textContent = 'Selecciona una cámara y presiona Iniciar.';
-      }catch(e){
-        $camSel.innerHTML = '<option>Error listando cámaras</option>';
-        $status.textContent = 'Error listando cámaras. Asegúrate de usar HTTPS y otorgar permisos.';
-      }
+async function listCams(){
+  try{
+    await requestCamPermission();
+    const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+    $camSel.innerHTML = '';
+    if (!devices || !devices.length) {
+      $camSel.innerHTML = '<option>No hay cámaras</option>';
+      $status.textContent = 'No se detectaron cámaras. Revisa permisos del navegador y HTTPS.';
+      return;
     }
+    devices.forEach((c,i)=>{
+      const opt=document.createElement('option');
+      opt.value=c.deviceId; opt.textContent=c.label || ('Cámara '+(i+1));
+      $camSel.appendChild(opt);
+    });
+    $status.textContent = 'Selecciona una cámara y presiona Iniciar.';
+  }catch(e){
+    $camSel.innerHTML = '<option>Error listando cámaras</option>';
+    $status.textContent = 'Error listando cámaras. Asegúrate de usar HTTPS y otorgar permisos.';
+  }
+}
 
     async function startCam(){
       if (scanner) return;
