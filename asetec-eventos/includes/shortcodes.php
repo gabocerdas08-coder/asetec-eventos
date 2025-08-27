@@ -235,17 +235,17 @@ add_shortcode('asetec_checkin', function($atts){
     function beepOK(){ try{ new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAABAA==').play(); }catch(e){} }
 
     // ====== Cámara: solicitar permiso y listar ======
-    let scanner = null;
+let scanner = null;
+let scanStop = null;
 
-    async function requestCamPermission(){
-      // Algunos navegadores no listan cámaras hasta que se pide getUserMedia
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        stream.getTracks().forEach(t => t.stop());
-      } catch(e) {
-        // Ignoramos; el botón Iniciar volverá a pedir permiso
-      }
-    }
+async function requestCamPermission(){
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    stream.getTracks().forEach(t => t.stop());
+  } catch(e) {
+    // Ignoramos; el botón Iniciar volverá a pedir permiso
+  }
+}
 
 async function listCams(){
   try{
@@ -269,8 +269,6 @@ async function listCams(){
   }
 }
 
-let scanner = null;
-let scanStop = null;
 
 async function startCam(){
   if (scanner) return;
