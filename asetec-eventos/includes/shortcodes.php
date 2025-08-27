@@ -333,7 +333,6 @@ async function stopCam(){
 
     $camStart.onclick = startCam;
     $camStop.onclick  = stopCam;
-    listCams();
 
     // ====== Lookup por token (QR o lector USB) ======
     async function doLookup(tok){
@@ -399,12 +398,16 @@ async function stopCam(){
     $cedBtn.onclick = doLookupCed;
     $ced.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); doLookupCed(); } });
 
-    // En móvil intenta arrancar trasera al abrir la pestaña QR (cumple gesto al presionar "Iniciar")
-    if (/Mobi|Android/i.test(navigator.userAgent)) {
-      setTimeout(()=>{ if (!$camSel.value) listCams(); }, 400);
-    } else {
-      listCams();
-    }
+// Solo una llamada a listCams, según dispositivo:
+$camStart.onclick = startCam;
+$camStop.onclick  = stopCam;
+
+// Solo una llamada a listCams, según dispositivo:
+if (/Mobi|Android/i.test(navigator.userAgent)) {
+  setTimeout(()=>{ if (!$camSel.value) listCams(); }, 400);
+} else {
+  listCams();
+}
   })();
   </script>
   <?php
