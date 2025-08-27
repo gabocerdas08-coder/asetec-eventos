@@ -405,8 +405,8 @@ async function stopCam(){
     } else {
       listCams();
     }
-});
-</script>
+  })();
+  </script>
   <?php
   return ob_get_clean();
 });
