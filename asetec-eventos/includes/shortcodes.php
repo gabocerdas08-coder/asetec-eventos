@@ -156,22 +156,30 @@ add_shortcode('asetec_checkin', function($atts){
     <h2 style="margin:0 0 12px">Check-in — <strong><?php echo esc_html($a['event_code']); ?></strong></h2>
 
     <div style="display:flex;gap:10px;margin-bottom:10px">
-      <button class="button button-primary" data-tab="qr">Escanear QR</button>
+      <button class="button button-primary" data-tab="token">Buscar por token</button>
       <button class="button" data-tab="cedula">Buscar por cédula</button>
-      <span style="margin-left:auto;color:#666;font-size:12px">Sugerencia: en PC puedes usar lector USB (modo teclado) sobre el campo de token.</span>
+      <span style="margin-left:auto;color:#666;font-size:12px">Sugerencia: en PC podés usar lector USB (modo teclado) sobre el campo de token.</span>
     </div>
 
-<div id="tab-qr" class="tab-pane" style="border:1px solid #ddd;border-radius:8px;padding:12px">
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-    <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;min-width:220px;padding:8px;border:1px solid #ccc;border-radius:6px">
-    <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
-    <button id="ci-lookup" class="button button-primary">Buscar</button>
-  </div>
-  <div id="ci-result" style="margin-top:10px;border:1px solid #ddd;border-radius:8px;padding:12px;min-height:140px">
-    <em>Ingresa un token para ver el ticket…</em>
-  </div>
-</div>
+    <!-- TAB TOKEN (SIN CÁMARA) -->
+    <div id="tab-token" class="tab-pane" style="border:1px solid #ddd;border-radius:8px;padding:12px">
+      <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <div style="flex:1;min-width:280px">
+          <div style="display:flex;gap:8px">
+            <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
+            <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
+            <button id="ci-lookup" class="button button-primary">Buscar</button>
+          </div>
+        </div>
+        <div style="flex:1;min-width:280px">
+          <div id="ci-result" style="border:1px solid #ddd;border-radius:8px;padding:12px;min-height:180px">
+            <em>Ingresá un token para ver el ticket…</em>
+          </div>
+        </div>
+      </div>
+    </div>
 
+    <!-- TAB CÉDULA -->
     <div id="tab-cedula" class="tab-pane" style="display:none;border:1px solid #ddd;border-radius:8px;padding:12px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input id="ci-cedula" type="text" placeholder="Cédula (sin guiones)" style="flex:1;min-width:220px;padding:8px;border:1px solid #ccc;border-radius:6px">
@@ -179,11 +187,11 @@ add_shortcode('asetec_checkin', function($atts){
         <button id="ci-ced-lookup" class="button button-primary">Buscar</button>
       </div>
       <div id="ci-ced-result" style="margin-top:10px;border:1px solid #ddd;border-radius:8px;padding:12px;min-height:140px">
-        <em>Ingresa una cédula para recuperar el ticket…</em>
+        <em>Ingresá una cédula para recuperar el ticket…</em>
       </div>
     </div>
   </div>
-  
+
   <script>
   (function(){
     const API   = "<?php echo esc_js($api); ?>";
@@ -192,94 +200,33 @@ add_shortcode('asetec_checkin', function($atts){
 
     // Tabs
     const tabBtns = document.querySelectorAll('#asetec-ci [data-tab]');
-    const panes = { qr: document.getElementById('tab-qr'), cedula: document.getElementById('tab-cedula') };
+    const panes = { token: document.getElementById('tab-token'), cedula: document.getElementById('tab-cedula') };
     tabBtns.forEach(b => b.onclick = () => {
       tabBtns.forEach(x => x.classList.remove('button-primary'));
       b.classList.add('button-primary');
-      panes.qr.style.display = (b.dataset.tab==='qr'?'block':'none');
-      panes.cedula.style.display = (b.dataset.tab==='cedula'?'block':'none');
+      panes.token.style.display   = (b.dataset.tab==='token'  ? 'block':'none');
+      panes.cedula.style.display  = (b.dataset.tab==='cedula' ? 'block':'none');
     });
 
-    // UI elements
-    const $camSel  = document.getElementById('ci-camera');
-    const $camStart= document.getElementById('ci-cam-start');
-    const $camStop = document.getElementById('ci-cam-stop');
-    const $qrBox   = document.getElementById('qr-reader');
-    const $status  = document.getElementById('qr-status');
-    const $token   = document.getElementById('ci-token');
-    const $qty     = document.getElementById('ci-qty');
-    const $lookup  = document.getElementById('ci-lookup');
-    const $res     = document.getElementById('ci-result');
+    // Elementos TOKEN
+    const $token  = document.getElementById('ci-token');
+    const $qty    = document.getElementById('ci-qty');
+    const $lookup = document.getElementById('ci-lookup');
+    const $res    = document.getElementById('ci-result');
 
+    // Elementos CÉDULA
     const $ced    = document.getElementById('ci-cedula');
     const $qty2   = document.getElementById('ci-qty2');
     const $cedBtn = document.getElementById('ci-ced-lookup');
     const $cedRes = document.getElementById('ci-ced-result');
 
-    // Token helpers
     function extractToken(text){
       try { const u=new URL(text); const tid=u.searchParams.get('tid'); if(tid) return tid; } catch(e){}
       return (text||'').trim();
     }
     function beepOK(){ try{ new Audio('data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAACJWAAACABYAAAABAA==').play(); }catch(e){} }
 
-    // ====== QR cámara ======
-    let scanner = null;
-    async function listCams(){
-      try{
-        const cams = await Html5Qrcode.getCameras();
-        $camSel.innerHTML = '';
-        cams.forEach((c,i)=>{
-          const opt=document.createElement('option');
-          opt.value=c.id; opt.textContent=c.label || ('Cámara '+(i+1));
-          $camSel.appendChild(opt);
-        });
-        // auto-selección: si móvil intenta cámara trasera
-        if (/Mobi|Android/i.test(navigator.userAgent) && cams.length>1) {
-          const back = cams.find(c => /back|trasera|rear/i.test(c.label));
-          if (back) $camSel.value = back.id;
-        }
-      }catch(e){
-        $camSel.innerHTML = '<option>No hay cámaras</option>';
-      }
-    }
-    async function startCam(){
-      if (scanner) return;
-      scanner = new Html5Qrcode("qr-reader");
-      const camId = $camSel.value;
-      $status.textContent = 'Iniciando cámara…';
-      try{
-        await scanner.start(
-          { deviceId: { exact: camId } },
-          { fps: 10, qrbox: 250 },
-          onScanSuccess,
-          onScanFailure
-        );
-        $status.textContent = 'Cámara activa';
-      }catch(e){
-        $status.textContent = 'No se pudo iniciar la cámara';
-      }
-    }
-    async function stopCam(){
-      if (!scanner) return;
-      try{ await scanner.stop(); scanner.clear(); }catch(e){}
-      scanner = null;
-      $status.textContent = 'Cámara detenida';
-    }
-    function onScanSuccess(decodedText){
-      const tok = extractToken(decodedText);
-      $token.value = tok;
-      $status.textContent = 'QR leído: ' + (tok ? tok.slice(0,16)+'…' : '');
-      doLookup(tok);
-      beepOK();
-    }
-    function onScanFailure(err){ /* silencio */ }
-
-    $camStart.onclick = startCam;
-    $camStop.onclick  = stopCam;
-    listCams(); // cargar lista al abrir
-
-    // ====== Lookup por token (QR o lector USB) ======
+    // ====== Lookup por TOKEN ======
     async function doLookup(tok){
       if (!tok) { $res.innerHTML='<em>Token vacío</em>'; return; }
       $res.innerHTML = '<em>Buscando…</em>';
@@ -297,7 +244,9 @@ add_shortcode('asetec_checkin', function($atts){
         </button></div>
       `;
       document.getElementById('ci-confirm').onclick = () => doConfirm({ token: tok });
+      beepOK();
     }
+
     async function doConfirm(ident){
       const qty = Math.max(1, parseInt(($qty.value||$qty2.value||1)));
       const r = await fetch(`${API}/checkin`, {
@@ -307,11 +256,11 @@ add_shortcode('asetec_checkin', function($atts){
       });
       const j = await r.json();
       if (!r.ok) {
-        const box = panes.qr.style.display!=='none' ? $res : $cedRes;
+        const box = panes.cedula.style.display!=='none' ? $cedRes : $res;
         box.innerHTML = `<div style="color:#b00020"><strong>Error:</strong> ${j.message||'No se pudo registrar'}</div>`;
         return;
       }
-      const box = panes.qr.style.display!=='none' ? $res : $cedRes;
+      const box = panes.cedula.style.display!=='none' ? $cedRes : $res;
       box.innerHTML = `
         <div style="color:#0a7f2e"><strong>${j.message}</strong></div>
         <div><strong>Entrada:</strong> #${j.ticket.entry_number}</div>
@@ -320,13 +269,14 @@ add_shortcode('asetec_checkin', function($atts){
       `;
       beepOK();
     }
+
     $lookup.addEventListener('click', ()=> doLookup(extractToken($token.value)));
     $token.addEventListener('keydown', e => { if (e.key==='Enter') { e.preventDefault(); $lookup.click(); } });
 
-    // ====== Lookup por cédula ======
+    // ====== Lookup por CÉDULA ======
     async function doLookupCed(){
       const ced = ($ced.value||'').trim();
-      if (!ced) { $cedRes.innerHTML='<em>Ingresa una cédula</em>'; return; }
+      if (!ced) { $cedRes.innerHTML='<em>Ingresá una cédula</em>'; return; }
       $cedRes.innerHTML = '<em>Buscando…</em>';
       const url = `${API}/checkin/lookup-by-cedula?event_code=${encodeURIComponent(EVENT)}&cedula=${encodeURIComponent(ced)}`;
       const r = await fetch(url, { credentials:'same-origin' });
@@ -343,15 +293,11 @@ add_shortcode('asetec_checkin', function($atts){
         </div>
       `;
       document.getElementById('ci-confirm2').onclick = () => doConfirm({ ticket_id: t.id });
+      beepOK();
     }
+
     $cedBtn.onclick = doLookupCed;
     $ced.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); doLookupCed(); } });
-
-    // Si es móvil, intenta iniciar cámara al abrir la pestaña QR
-    if (/Mobi|Android/i.test(navigator.userAgent)) {
-      // pequeño delay para que cargue la lista
-      setTimeout(()=>{ if (!$camSel.value) listCams(); startCam(); }, 400);
-    }
   })();
   </script>
   <?php
