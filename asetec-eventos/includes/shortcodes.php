@@ -165,11 +165,11 @@ add_shortcode('asetec_checkin', function($atts){
     <div id="tab-token" class="tab-pane" style="border:1px solid #ddd;border-radius:8px;padding:12px">
       <div style="display:flex;gap:16px;flex-wrap:wrap">
         <div style="flex:1;min-width:280px">
-          <div style="display:flex;gap:8px">
-            <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
-            <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
-            <button id="ci-lookup" class="button button-primary">Buscar</button>
-          </div>
+<div style="display:flex;gap:8px">
+  <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
+  <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
+</div>
+
         </div>
         <div style="flex:1;min-width:280px">
           <div id="ci-result" style="border:1px solid #ddd;border-radius:8px;padding:12px;min-height:180px">
