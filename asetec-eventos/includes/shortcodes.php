@@ -161,33 +161,16 @@ add_shortcode('asetec_checkin', function($atts){
       <span style="margin-left:auto;color:#666;font-size:12px">Sugerencia: en PC puedes usar lector USB (modo teclado) sobre el campo de token.</span>
     </div>
 
-    <div id="tab-qr" class="tab-pane" style="border:1px solid #ddd;border-radius:8px;padding:12px">
-      <div style="display:flex;gap:16px;flex-wrap:wrap">
-        <div style="flex:1;min-width:280px">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-            <label for="ci-camera">Cámara:</label>
-            <select id="ci-camera" style="flex:1;padding:6px;border:1px solid #ccc;border-radius:6px"><option>Cargando…</option></select>
-            <button id="ci-cam-start" class="button">Iniciar</button>
-            <button id="ci-cam-stop" class="button">Detener</button>
-          </div>
-          <div id="qr-reader" style="width:100%;min-height:260px;border:1px dashed #bbb;border-radius:8px"></div>
-          <div id="qr-status" style="margin-top:6px;color:#666;font-size:12px"></div>
-
-          <div style="margin:10px 0;text-align:center;color:#666">o ingresa manual:</div>
-          <div style="display:flex;gap:8px">
-            <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;padding:8px;border:1px solid #ccc;border-radius:6px">
-            <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
-            <button id="ci-lookup" class="button button-primary">Buscar</button>
-          </div>
-        </div>
-
-        <div style="flex:1;min-width:280px">
-          <div id="ci-result" style="border:1px solid #ddd;border-radius:8px;padding:12px;min-height:180px">
-            <em>Escanea un QR o ingresa un token para ver el ticket…</em>
-          </div>
-        </div>
-      </div>
-    </div>
+<div id="tab-qr" class="tab-pane" style="border:1px solid #ddd;border-radius:8px;padding:12px">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input id="ci-token" type="text" placeholder="token o URL con ?tid=" style="flex:1;min-width:220px;padding:8px;border:1px solid #ccc;border-radius:6px">
+    <input id="ci-qty" type="number" min="1" value="1" style="width:90px;padding:8px;border:1px solid #ccc;border-radius:6px">
+    <button id="ci-lookup" class="button button-primary">Buscar</button>
+  </div>
+  <div id="ci-result" style="margin-top:10px;border:1px solid #ddd;border-radius:8px;padding:12px;min-height:140px">
+    <em>Ingresa un token para ver el ticket…</em>
+  </div>
+</div>
 
     <div id="tab-cedula" class="tab-pane" style="display:none;border:1px solid #ddd;border-radius:8px;padding:12px">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -200,8 +183,7 @@ add_shortcode('asetec_checkin', function($atts){
       </div>
     </div>
   </div>
-
-  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  
   <script>
   (function(){
     const API   = "<?php echo esc_js($api); ?>";
