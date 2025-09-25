@@ -55,10 +55,15 @@ if (!class_exists('Asetec_Board_API')) {
       $params  = array();
 
       if ($q !== '') {
-        $like = '%' . $wpdb->esc_like($q) . '%';
-        $where[] = "(LOWER(TRIM(m.cedula)) LIKE LOWER(TRIM(%s)) OR LOWER(TRIM(m.nombre)) LIKE LOWER(TRIM(%s)))";
-        $params[] = $like;
-        $params[] = $like;
+        if (is_numeric($q)) {
+          $where[] = "(m.cedula = %s OR LOWER(TRIM(m.nombre)) LIKE LOWER(TRIM(%s)))";
+          $params[] = $q;
+          $params[] = '%' . $wpdb->esc_like($q) . '%';
+        } else {
+          $like = '%' . $wpdb->esc_like($q) . '%';
+          $where[] = "LOWER(TRIM(m.nombre)) LIKE LOWER(TRIM(%s))";
+          $params[] = $like;
+        }
       }
 
       switch ($status) {
