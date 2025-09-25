@@ -91,7 +91,7 @@ if (!class_exists('Asetec_Board_API')) {
       global $wpdb;
 
       $event_code = isset($req['event_code']) ? sanitize_text_field($req['event_code']) : '';
-      $q          = isset($req['q']) ? sanitize_text_field($req['q']) : '';
+      $q = isset($req['q']) ? trim($req['q']) : '';
       $status     = isset($req['status']) ? sanitize_text_field($req['status']) : 'all';
       $page       = max(1, intval(isset($req['page']) ? $req['page'] : 1));
       $per_page   = min(500, max(1, intval(isset($req['per_page']) ? $req['per_page'] : 50)));
