@@ -134,7 +134,7 @@ if (!class_exists('Asetec_Board_API')) {
                 $where_sql
                 ORDER BY m.nombre ASC
                 LIMIT " . intval($per_page) . " OFFSET " . intval($offset);
-
+      $sql = asetec_wpdb_prepare_safe($sql, $params);
       $rows = $wpdb->get_results($sql, ARRAY_A);
 
       $items = array();
