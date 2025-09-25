@@ -56,10 +56,11 @@ if (!class_exists('Asetec_Board_API')) {
 
       if ($q !== '') {
         if (is_numeric($q)) {
-          $where[] = "(m.cedula = %s OR LOWER(TRIM(m.nombre)) LIKE LOWER(TRIM(%s)))";
+          // Búsqueda exacta por cédula, igual que el check-in
+          $where[] = "m.cedula = %s";
           $params[] = $q;
-          $params[] = '%' . $wpdb->esc_like($q) . '%';
         } else {
+          // Búsqueda por nombre (LIKE, insensible a mayúsculas/minúsculas)
           $like = '%' . $wpdb->esc_like($q) . '%';
           $where[] = "LOWER(TRIM(m.nombre)) LIKE LOWER(TRIM(%s))";
           $params[] = $like;
