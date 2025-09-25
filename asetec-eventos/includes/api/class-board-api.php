@@ -56,7 +56,7 @@ if (!class_exists('Asetec_Board_API')) {
 
       if ($q !== '') {
         $like = '%' . $wpdb->esc_like($q) . '%';
-        $where[] = "(m.cedula LIKE %s OR m.nombre LIKE %s)";
+        $where[] = "(LOWER(TRIM(m.cedula)) LIKE LOWER(TRIM(%s)) OR LOWER(TRIM(m.nombre)) LIKE LOWER(TRIM(%s)))";
         $params[] = $like;
         $params[] = $like;
       }
