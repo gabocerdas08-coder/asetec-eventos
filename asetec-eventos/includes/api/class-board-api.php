@@ -188,11 +188,17 @@ if (!class_exists('Asetec_Board_API')) {
       $csv = stream_get_contents($fh);
       fclose($fh);
 
-      $resp = new WP_REST_Response($csv, 200);
-      $resp->header('Content-Type', 'text/csv; charset=UTF-8');
+      /* Limpia cualquier salida previa y envía CSV crudo */
+      while (ob_get_level()) { ob_end_clean(); }
+      nocache_headers();
       $filename = 'reporte_' . sanitize_file_name($data['event']['code']) . '_' . date('Ymd_His') . '.csv';
-      $resp->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
-      return $resp;
+      header('Content-Type: text/csv; charset=UTF-8');
+      header('Content-Disposition: attachment; filename="'.$filename.'"');
+      header('X-Content-Type-Options: nosniff');
+
+      echo $csv;
+      exit;
+
     }
   }
 }
