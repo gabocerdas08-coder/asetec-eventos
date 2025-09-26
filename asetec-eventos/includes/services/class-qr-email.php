@@ -64,7 +64,7 @@ class Asetec_QR_Email {
     $html .= '<ul style="margin:8px 0 0;padding-left:18px">';
     $html .= sprintf('<li><strong>Entrada:</strong> #%d</li>', intval($ticket['entry_number']));
     $html .= sprintf('<li><strong>Asociado:</strong> %s — cédula %s</li>', esc_html($ticket['nombre']), esc_html($ticket['cedula']));
-    $html .= sprintf('<li><strong>Válido para:</strong> %s</li>', esc_html($capT));
+    $html .= sprintf('<li><strong>Cantidad de invitados:</strong> %d</li>', max(0, $cap - 1));
     $html .= '</ul>';
     $html .= '<p style="margin:12px 0">Presenta este QR en el ingreso. Si traes acompañantes, deben ingresar junto contigo.</p>';
     $html .= '<hr style="margin:16px 0;border:none;border-top:1px solid #ddd">';
