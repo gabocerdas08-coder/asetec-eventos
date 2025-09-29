@@ -57,40 +57,21 @@ class Asetec_Zoho_Hook {
   }
 
   /** Mapeo por evento opcional (si no, defaults) */
-private function get_formmap($event_code) {
-  $map = get_option('asetec_formmap_' . $event_code);
-  if (is_array($map) && !empty($map)) return $map;
+  private function get_formmap($event_code) {
+    $map = get_option('asetec_formmap_' . $event_code);
+    if (is_array($map) && !empty($map)) return $map;
 
-  return array(
-    'cedula_field'    => 'cedula',
-    'nombre_field'    => 'nombre',
-    'apellido1_field' => 'apellido1',
-    'apellido2_field' => 'apellido2',
-    'email_field'     => 'email',
-
-    // Modo de capacidad
-    'capacity_mode'   => 'from_many', // 'fixed' | 'from_field' | 'from_many'
-
-    // Si usas un solo campo:
-    'capacity_field'  => 'total_personas',
-
-    // <<< NUEVO: lista de posibles campos de cantidad desde Zoho Forms
-    'capacity_fields' => array('total_personas','cantidad_hijos','cantidad_nietos','cantidad_sobrinos','cantidad_solo'),
-
-    // <<< NUEVO: campo radio para aplicar topes (opcional)
-    'option_field'    => 'opcion_asistencia',
-
-    // <<< NUEVO: topes por opción (slugs de las etiquetas del radio)
-    'option_limits'   => array(
-      // hijos: sin tope superior (null)
-      'asistire-con-mis-hijos-menores-de-edad'   => array('min'=>1, 'max'=>null),
-      'asistire-con-nietos-menores-de-edad'      => array('min'=>1, 'max'=>2),
-      'asistire-con-sobrinos-menores-de-edad'    => array('min'=>1, 'max'=>2),
-      'asistire-solo'                             => array('min'=>1, 'max'=>1),
-    ),
-  );
-}
-
+    return array(
+      'cedula_field'    => 'cedula',
+      'nombre_field'    => 'nombre',
+      'apellido1_field' => 'apellido1',
+      'apellido2_field' => 'apellido2',
+      'email_field'     => 'email',
+      'capacity_mode'   => 'from_field', // "fixed" o "from_field"
+      'capacity_field'  => 'total_personas',
+      'extras_fields'   => array(),       // si querés guardar página 2 en otro lugar más adelante
+    );
+  }
 
   /** Toma un valor del array, tolerante a llaves con espacios/acentos */
   private function pick($arr, $key, $default = '') {
@@ -102,13 +83,6 @@ private function get_formmap($event_code) {
     }
     return $default;
   }
-  private function to_int_or_zero($v) {
-  if ($v === null) return 0;
-  if (is_string($v)) $v = trim($v);
-  if ($v === '' || $v === false) return 0;
-  return (int)$v;
-}
-
 
   /** Próximo número de entrada dentro del evento */
   private function next_entry_number($event_id) {
@@ -162,39 +136,13 @@ private function get_formmap($event_code) {
     $nombre_full = trim($nom . ' ' . $ap1 . ' ' . $ap2);
 
     // Capacity
-// === CAPACITY (soporta múltiples campos y topes por opción) ===
-$capacity = 1;
-
-if ($map['capacity_mode'] === 'fixed') {
-  $capacity = 1; // o un número fijo si lo deseas
-
-} elseif ($map['capacity_mode'] === 'from_field') {
-  $cap = $this->to_int_or_zero( $this->pick($body, $map['capacity_field'], 1) );
-  $capacity = max(1, $cap);
-
-} elseif ($map['capacity_mode'] === 'from_many') {
-  $cands = array();
-  foreach ((array)($map['capacity_fields'] ?? array()) as $k) {
-    $cands[] = $this->to_int_or_zero( $this->pick($body, $k, 0) );
-  }
-  // Toma el mayor (o el único que viene con valor)
-  $capacity = max(1, max($cands));
-}
-
-// (Opcional) Aplica topes por opción (radio)
-$option_val  = $this->pick($body, $map['option_field'] ?? '', '');
-$option_slug = sanitize_title($option_val);
-if ($option_slug && !empty($map['option_limits'][$option_slug])) {
-  $lim  = $map['option_limits'][$option_slug];
-  $min  = isset($lim['min']) ? (int)$lim['min'] : 1;
-  $max  = isset($lim['max']) ? $lim['max'] : null; // null = sin tope
-
-  $capacity = max($min, (int)$capacity);
-  if ($max !== null) $capacity = min((int)$max, (int)$capacity);
-}
-
-// Seguridad mínima
-$capacity = max(1, (int)$capacity);
+    $capacity = 1;
+    if ($map['capacity_mode'] === 'from_field') {
+      $cap = (int) $this->pick($body, $map['capacity_field'], 1);
+      $capacity = max(1, $cap);
+    } else {
+      $capacity = 1; // default si no usás formulario familiar
+    }
 
     global $wpdb;
     $members = $wpdb->prefix . 'asetec_members';
