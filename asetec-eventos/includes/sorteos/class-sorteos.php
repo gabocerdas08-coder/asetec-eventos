@@ -247,35 +247,57 @@ public static function render_shortcode($atts) {
   }
 
   // ----------- CARGA LISTA -----------
-  function loadList(){
-    const ev = $event.value;
-    if (!ev){ alert('Seleccioná un evento.'); return; }
-    const status = $filter.value;
+    async function loadList(){
+      const ev = $event.value;
+      if (!ev){ alert('Seleccioná un evento.'); return; }
+      const status = $filter.value;
 
-    const url = new URL(listURL, window.location.origin);
-    url.searchParams.set('event_code', ev);
-    url.searchParams.set('page', 1);
-    url.searchParams.set('per_page', 5000);
-    if (status && status !== 'all') url.searchParams.set('status', status);
+      $info.textContent = 'Cargando participantes…';
+      participantes = [];
+      angleOffset = 0;
 
-    $info.textContent = 'Cargando participantes…';
-    fetch(url.toString())
-      .then(r => r.json())
-      .then(data => {
-        participantes = (data.items||[]).map(it => ({ cedula: it.cedula, nombre: it.nombre }));
+      const perPage = 500; // tope del server
+      let page = 1;
+      let total = Infinity;
+
+      try {
+        while ((page - 1) * perPage < total) {
+          const url = new URL(listURL, window.location.origin);
+          url.searchParams.set('event_code', ev);
+          url.searchParams.set('page', page);
+          url.searchParams.set('per_page', perPage);
+          if (status && status !== 'all') url.searchParams.set('status', status);
+
+          const r = await fetch(url.toString());
+          const data = await r.json();
+          if (!r.ok) throw new Error(data && data.message || 'Error de API');
+
+          total = Number(data.total || 0);
+          const items = (data.items || []).map(it => ({ cedula: it.cedula, nombre: it.nombre }));
+          participantes.push(...items);
+
+          // si no llegaron items, corta por seguridad
+          if (!items.length) break;
+          page++;
+        }
+
         $info.textContent = `Participantes cargados: ${participantes.length}`;
         if (participantes.length){
           $wrap.style.display = 'block';
           $actions.style.display = 'flex';
-          angleOffset = 0;
           drawWheel(participantes);
         } else {
           $wrap.style.display = 'none';
           $actions.style.display = 'none';
         }
-      })
-      .catch(() => { $info.textContent = 'Error cargando lista'; });
-  }
+      } catch (e) {
+        console.error(e);
+        $info.textContent = 'Error cargando lista';
+        $wrap.style.display = 'none';
+        $actions.style.display = 'none';
+      }
+    }
+
 
   // ----------- GIRAR 1 VEZ -----------
   function spin(){
