@@ -105,8 +105,10 @@ public static function render_shortcode($atts) {
       if (!total) return;
 
       // Flecha/puntero FIJO a la derecha (ángulo 0, eje +X)
+// Flecha/puntero FIJO a la izquierda (ángulo π rad / eje -X)
       ctx.save();
       ctx.translate(cx, cy);
+      ctx.rotate(Math.PI); // gira la flecha hacia la izquierda
       ctx.fillStyle = '#b71c1c';
       ctx.beginPath();
       ctx.moveTo(r-10, 0);
@@ -115,6 +117,7 @@ public static function render_shortcode($atts) {
       ctx.closePath();
       ctx.fill();
       ctx.restore();
+
 
       const slice = (2*Math.PI)/total;
 
