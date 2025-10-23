@@ -104,20 +104,25 @@ public static function render_shortcode($atts) {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       if (!total) return;
 
-      // Triángulo puntero
+      // Flecha/puntero a la DERECHA (eje +X)
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(0);
       ctx.fillStyle = '#b71c1c';
       ctx.beginPath();
-      ctx.moveTo(r-10, 0);
-      ctx.lineTo(r+10, -8);
-      ctx.lineTo(r+10, 8);
+      ctx.moveTo(r-8, 0);
+      ctx.lineTo(r+12, -9);
+      ctx.lineTo(r+12,  9);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
 
       const slice = (2*Math.PI)/total;
+
+      // Tamaño de fuente dinámico
+      // 10–16 px, y ocultar algunos labels cuando hay demasiados
+      let fontSize = Math.max(10, Math.min(16, Math.floor(280/total)));
+      const showEvery = (total > 60) ? Math.ceil(total/40) : 1; // muestra ~40 etiquetas máx.
+
       for (let i=0;i<total;i++){
         const start = angleOffset + i*slice;
         const end   = start + slice;
@@ -129,18 +134,23 @@ public static function render_shortcode($atts) {
         ctx.arc(cx, cy, r-16, start, end);
         ctx.fill();
 
-        // texto
-        ctx.save();
-        ctx.translate(cx, cy);
-        ctx.rotate(start + slice/2);
-        ctx.textAlign = 'right';
-        ctx.fillStyle = '#111';
-        ctx.font = '14px system-ui, sans-serif';
-        const label = (items[i].nombre || '').slice(0, 22) + (items[i].nombre.length>22 ? '…' : '');
-        ctx.fillText(label, r-32, 4);
-        ctx.restore();
+        // etiqueta (saltamos algunas si hay demasiadas)
+        if (i % showEvery === 0){
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(start + slice/2);
+          ctx.textAlign = 'right';
+          ctx.fillStyle = '#111';
+          ctx.font = `${fontSize}px system-ui, sans-serif`;
+          const raw = items[i].nombre || '';
+          const maxChars = (total > 60) ? 14 : 22;
+          const label = raw.length > maxChars ? raw.slice(0,maxChars) + '…' : raw;
+          ctx.fillText(label, r-30, 4);
+          ctx.restore();
+        }
       }
     }
+
 
     function loadList(){
       $winBox.textContent = '';
@@ -151,6 +161,8 @@ public static function render_shortcode($atts) {
       const url = new URL(exportURL, window.location.origin);
       url.searchParams.set('event_code', ev);
       if (status && status !== 'all') url.searchParams.set('status', status);
+      url.searchParams.set('per_page', 5000);
+
 
       $info.textContent = 'Cargando participantes…';
       fetch(url.toString())
@@ -172,17 +184,16 @@ public static function render_shortcode($atts) {
     function spin(){
       if (!participantes.length) return;
 
-      // elegir índice ganador
-      const idx = Math.floor(Math.random() * participantes.length);
       const total = participantes.length;
       const slice = (2*Math.PI)/total;
 
-      // Queremos que el puntero caiga en el centro del sector ganador
-      const targetAngle = (Math.PI/2) - (idx*slice + slice/2); // puntero a la derecha
-      let final = targetAngle;
+      // Índice ganador
+      const idx = Math.floor(Math.random() * total);
 
-      // agregar vueltas para animación (3.5 giros)
-      final += 2*Math.PI*3.5;
+      // Queremos que el centro del segmento ganador quede en el ángulo 0 (puntero a la derecha)
+      const base = -(idx * slice + slice/2);    // orientación final deseada
+      const turns = 3.5;                         // vueltas para animación
+      const final = base + 2*Math.PI*turns;      // destino total
 
       const start = angleOffset;
       const delta = final - start;
@@ -191,25 +202,28 @@ public static function render_shortcode($atts) {
 
       function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 
+      const ganador = participantes[idx];
+
       function frame(now){
         const t = Math.min(1, (now - t0) / dur);
         angleOffset = start + delta * easeOutCubic(t);
         drawWheel(participantes);
-        if (t < 1) { requestAnimationFrame(frame); }
-        else {
-          angleOffset = start + delta; // fijar exacto
+        if (t < 1) {
+          requestAnimationFrame(frame);
+        } else {
+          angleOffset = start + delta; // fijar
           drawWheel(participantes);
-          const ganador = participantes[idx];
           $winBox.textContent = `🎉 Ganador: ${ganador.nombre} — ${ganador.cedula}`;
           historial.unshift(ganador);
           $last.textContent = 'Últimos: ' + historial.slice(0,5).map(x=>x.nombre).join(', ');
           if ($unique.checked){
-            participantes.splice(idx, 1);
+            participantes.splice(idx, 1); // evitar repetidos
           }
         }
       }
       requestAnimationFrame(frame);
     }
+
 
     $load.addEventListener('click', loadList);
     document.getElementById('btn-sortear').addEventListener('click', spin);
