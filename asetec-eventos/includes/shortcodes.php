@@ -78,7 +78,7 @@ function asetec_sc_event_board($atts=[]) {
       url.searchParams.set('per_page', PER_PAGE);
       if (q) url.searchParams.set('q', q);
       if (s && s !== 'all') url.searchParams.set('status', s);
-
+  console.log(url.toString());
       fetch(url.toString())
         .then(r => r.json())
         .then(data => {

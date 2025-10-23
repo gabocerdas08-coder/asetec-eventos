@@ -42,6 +42,8 @@ $files = array(
   ASETEC_EVT_INC . '/api/class-zoho-hook.php',      // Integración Zoho 
   ASETEC_EVT_INC . '/services/class-qr-email.php',  // QR + email
   ASETEC_EVT_INC . '/api/class-checkin-api.php', // API REST para check-in (staff)
+  ASETEC_EVT_INC . '/sorteos/class-sorteos.php', // módulo de sorteos
+
 );
 
 /** Requerir y recolectar faltantes */
@@ -81,3 +83,6 @@ add_action('plugins_loaded', function () {
   if (class_exists('Asetec_Zoho_Hook')) { new Asetec_Zoho_Hook(); }
   if (class_exists('Asetec_Checkin_API')) {new Asetec_Checkin_API();}
 });
+// Shortcode para módulo de sorteos
+add_shortcode('asetec_sorteos', ['Asetec_Sorteos', 'render_shortcode']);
+
