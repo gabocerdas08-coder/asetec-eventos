@@ -377,8 +377,11 @@ add_shortcode('asetec_checkin', function($atts){
 });
 // === Shortcode: [asetec_sorteos] ===
 // Registramos en 'init' para garantizar que la clase ya esté cargada
+// === Shortcode: [asetec_sorteos] ===
+// Lo registramos en 'init' para garantizar que todas las clases ya están cargadas
 add_action('init', function () {
   if (class_exists('Asetec_Sorteos')) {
     add_shortcode('asetec_sorteos', ['Asetec_Sorteos', 'render_shortcode']);
   }
 });
+
