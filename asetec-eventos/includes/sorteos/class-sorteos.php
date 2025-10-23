@@ -46,7 +46,7 @@ public static function render_shortcode($atts) {
 
     <!-- Ruleta -->
     <div id="sor-wheel-wrap" style="display:none;text-align:center">
-      <canvas id="ruletaCanvas" width="440" height="440" style="max-width:100%"></canvas><br>
+      <canvas id="ruletaCanvas" width="520" height="520" style="max-width:100%"></canvas>
       <button id="btn-sortear" class="button button-primary" style="margin-top:10px">🎡 Girar ruleta</button>
       <div id="sor-winner" style="margin-top:12px;font-weight:700;font-size:18px;color:#0a7f2e"></div>
       <div id="sor-last" style="margin-top:8px;color:#666;font-size:12px"></div>
@@ -104,52 +104,74 @@ public static function render_shortcode($atts) {
       ctx.clearRect(0,0,canvas.width,canvas.height);
       if (!total) return;
 
-      // Flecha/puntero a la DERECHA (eje +X)
+      // Flecha/puntero FIJO a la derecha (ángulo 0, eje +X)
       ctx.save();
       ctx.translate(cx, cy);
       ctx.fillStyle = '#b71c1c';
       ctx.beginPath();
-      ctx.moveTo(r-8, 0);
-      ctx.lineTo(r+12, -9);
-      ctx.lineTo(r+12,  9);
+      ctx.moveTo(r-10, 0);
+      ctx.lineTo(r+12, -8);
+      ctx.lineTo(r+12,  8);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
 
       const slice = (2*Math.PI)/total;
 
-      // Tamaño de fuente dinámico
-      // 10–16 px, y ocultar algunos labels cuando hay demasiados
-      let fontSize = Math.max(10, Math.min(16, Math.floor(280/total)));
-      const showEvery = (total > 60) ? Math.ceil(total/40) : 1; // muestra ~40 etiquetas máx.
+      // ===== Etiquetado adaptativo =====
+      //  - tamaño de fuente dinámico
+      //  - mostramos solo una fracción de etiquetas cuando hay muchos (ticks finos para el resto)
+      let fontSize = 16;
+      if (total >= 20)  fontSize = 14;
+      if (total >= 60)  fontSize = 12;
+      if (total >= 120) fontSize = 10;
+
+      // Mostrar ~40 etiquetas máximo repartidas uniformemente
+      const showEvery = (total > 40) ? Math.ceil(total / 40) : 1;
+
+      // Radio para el texto (lo ponemos cerca del borde para no encimar en el centro)
+      const textR = r - 26;
+
+      // Borde interior para evitar sobrepintar el centro
+      const innerR = r - 16;
 
       for (let i=0;i<total;i++){
         const start = angleOffset + i*slice;
         const end   = start + slice;
 
-        // sector
+        // Sector
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.fillStyle = (i%2 ? '#ffd54f' : '#ffa726');
-        ctx.arc(cx, cy, r-16, start, end);
+        ctx.arc(cx, cy, innerR, start, end);
         ctx.fill();
 
-        // etiqueta (saltamos algunas si hay demasiadas)
+        // Tick finito en el borde para todos los sectores (ayuda a ver los cortes)
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0,0,0,.15)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, innerR, start, start+0.001);
+        ctx.stroke();
+        ctx.restore();
+
+        // Etiqueta: solo cada N sectores si hay muchos
         if (i % showEvery === 0){
           ctx.save();
           ctx.translate(cx, cy);
           ctx.rotate(start + slice/2);
           ctx.textAlign = 'right';
-          ctx.fillStyle = '#111';
-          ctx.font = `${fontSize}px system-ui, sans-serif`;
+          ctx.fillStyle = '#222';
+          ctx.font = `${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
           const raw = items[i].nombre || '';
-          const maxChars = (total > 60) ? 14 : 22;
+          const maxChars = (total > 120) ? 12 : (total > 60 ? 16 : 22);
           const label = raw.length > maxChars ? raw.slice(0,maxChars) + '…' : raw;
-          ctx.fillText(label, r-30, 4);
+          ctx.fillText(label, textR, 4); // texto hacia afuera
           ctx.restore();
         }
       }
     }
+
 
 
     function loadList(){
@@ -189,29 +211,43 @@ public static function render_shortcode($atts) {
 
       // Índice ganador
       const idx = Math.floor(Math.random() * total);
-
-      // Queremos que el centro del segmento ganador quede en el ángulo 0 (puntero a la derecha)
-      const base = -(idx * slice + slice/2);    // orientación final deseada
-      const turns = 3.5;                         // vueltas para animación
-      const final = base + 2*Math.PI*turns;      // destino total
-
-      const start = angleOffset;
-      const delta = final - start;
-      const dur   = 1800; // ms
-      const t0    = performance.now();
-
-      function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
-
       const ganador = participantes[idx];
+
+      // --- Normalizadores de ángulos para evitar acumulaciones raras ---
+      const TAU = 2*Math.PI;
+      const norm = a => {
+        a = a % TAU;
+        return (a < 0) ? a + TAU : a;
+      };
+
+      // Estado actual normalizado
+      const current = norm(angleOffset);
+
+      // Centro del sector ganador debe quedar en ángulo 0 (puntero a la derecha)
+      const targetCenter = norm(-(idx*slice + slice/2));
+
+      // Giremos SIEMPRE hacia adelante (sentido antihorario en canvas)
+      let delta = targetCenter - current;
+      if (delta < 0) delta += TAU;
+
+      // Vueltas extra para animación
+      const turns = 3.5;
+      const final = angleOffset + delta + TAU*turns;
+
+      // Animación
+      const start = angleOffset;
+      const dur   = 1800;
+      const t0    = performance.now();
+      const easeOutCubic = t => 1 - Math.pow(1 - t, 3);
 
       function frame(now){
         const t = Math.min(1, (now - t0) / dur);
-        angleOffset = start + delta * easeOutCubic(t);
+        angleOffset = start + (final - start) * easeOutCubic(t);
         drawWheel(participantes);
         if (t < 1) {
           requestAnimationFrame(frame);
         } else {
-          angleOffset = start + delta; // fijar
+          angleOffset = final; // fijar exacto
           drawWheel(participantes);
           $winBox.textContent = `🎉 Ganador: ${ganador.nombre} — ${ganador.cedula}`;
           historial.unshift(ganador);
@@ -223,6 +259,7 @@ public static function render_shortcode($atts) {
       }
       requestAnimationFrame(frame);
     }
+
 
 
     $load.addEventListener('click', loadList);
