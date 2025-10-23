@@ -375,3 +375,10 @@ add_shortcode('asetec_checkin', function($atts){
   <?php
   return ob_get_clean();
 });
+// === Shortcode: [asetec_sorteos] ===
+// Registramos en 'init' para garantizar que la clase ya esté cargada
+add_action('init', function () {
+  if (class_exists('Asetec_Sorteos')) {
+    add_shortcode('asetec_sorteos', ['Asetec_Sorteos', 'render_shortcode']);
+  }
+});
