@@ -84,17 +84,33 @@ class Asetec_QR_Email {
       $attachments[] = $qr['path'];
     }
 
-    // Headers
+    // Headers (deja From / Reply-To / Content-Type)
     $headers = [
       'Content-Type: text/html; charset=UTF-8',
-      'From: ' . (defined('ASETEC_SMTP_NAME') ? ASETEC_SMTP_NAME : 'ASETEC Entradas') . ' <' . (defined('ASETEC_SMTP_FROM') ? ASETEC_SMTP_FROM : 'no-reply@' . parse_url(home_url(), PHP_URL_HOST)) . '>',
-      'Reply-To: ASETEC Entradas <' . (defined('ASETEC_SMTP_FROM') ? ASETEC_SMTP_FROM : 'no-reply@' . parse_url(home_url(), PHP_URL_HOST)) . '>',
-      'Bcc: ma.chaves@itcr.ac.cr', 'gabcerdas@itcr.ac.cr', // <- copia para tener registro en la bandeja (entrada), no en enviados
+      'From: ' . (defined('ASETEC_SMTP_NAME') ? ASETEC_SMTP_NAME : 'ASETEC Entradas')
+            . ' <' . (defined('ASETEC_SMTP_FROM') ? ASETEC_SMTP_FROM : ('no-reply@' . parse_url(home_url(), PHP_URL_HOST))) . '>',
+      'Reply-To: ASETEC Entradas <' . (defined('ASETEC_SMTP_FROM') ? ASETEC_SMTP_FROM : ('no-reply@' . parse_url(home_url(), PHP_URL_HOST))) . '>',
     ];
+
+    // === BCC robusto vía PHPMailer ===
+    $bcc_list = ['ma.chaves@itcr.ac.cr', 'gabcerdas@itcr.ac.cr']; // <-- tus copias
+    $__asetec_bcc_hook = function($phpmailer) use ($bcc_list) {
+      if (empty($bcc_list)) return;
+      foreach ($bcc_list as $addr) {
+        if (is_email($addr)) {
+          try { $phpmailer->addBCC($addr); } catch (\Throwable $e) { /* silencio */ }
+        }
+      }
+    };
+    add_action('phpmailer_init', $__asetec_bcc_hook);
 
     // Enviar
     $ok = wp_mail($to, $subject, $html, $headers, $attachments);
 
+    // Limpieza: quita el hook para no afectar otros correos
+    remove_action('phpmailer_init', $__asetec_bcc_hook);
+
     return $ok ? true : new WP_Error('mail', 'No se pudo enviar el correo');
+
   }
 }
