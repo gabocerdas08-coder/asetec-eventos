@@ -42,78 +42,87 @@ class Asetec_Checkin_API {
 
   }
 
-  public function resend_ticket_email( WP_REST_Request $req ) {
+public function resend_ticket_email( WP_REST_Request $req ) {
   global $wpdb;
 
   $event_code = sanitize_text_field( $req->get_param('event_code') );
-  $cedula     = sanitize_text_field( $req->get_param('cedula') );
+  $cedula     = preg_replace('/\D+/', '', (string)$req->get_param('cedula')); // solo dígitos
 
   if ($event_code === '' || $cedula === '') {
-    return new WP_Error('bad_request', 'Faltan parámetros', array('status' => 400));
+    return new WP_Error('bad_request', 'Faltan parámetros (event_code / cédula).', ['status'=>400]);
   }
 
-  // 1) Buscar evento
+  // 1) Resolver el id del evento por su código
   $ev = $wpdb->get_row(
     $wpdb->prepare("SELECT id, code, name FROM {$wpdb->prefix}asetec_events WHERE code=%s", $event_code),
     ARRAY_A
   );
-  if (!$ev) return new WP_Error('not_found', 'Evento no encontrado', array('status'=>404));
+  if (!$ev) {
+    return new WP_Error('not_found', 'Evento no encontrado: '.$event_code, ['status'=>404]);
+  }
 
-  // 2) Buscar ticket por cédula (JOIN members + tickets)
-  $m  = $wpdb->prefix . 'asetec_members';
+  // 2) Buscar ticket EXACTO para ese evento y esa cédula
   $tk = $wpdb->prefix . 'asetec_tickets';
-
   $row = $wpdb->get_row(
     $wpdb->prepare("
-      SELECT tk.id, tk.entry_number, tk.token, tk.capacity, tk.consumed, tk.email,
-             m.nombre, m.cedula
-      FROM $tk tk
-      INNER JOIN $m m ON m.id = tk.member_id
-      WHERE tk.event_id=%d AND m.cedula=%s
-      ORDER BY tk.id DESC
+      SELECT id, entry_number, token, capacity, consumed, email, nombre, cedula, status
+      FROM $tk
+      WHERE event_id=%d AND REPLACE(REPLACE(cedula,'-',''),' ','')=%s
+      ORDER BY id DESC
       LIMIT 1
     ", $ev['id'], $cedula),
     ARRAY_A
   );
 
   if (!$row) {
-    return new WP_Error('not_found', 'No existe ticket para esa cédula en este evento', array('status'=>404));
+    // Ayuda: listar en qué eventos SÍ tiene ticket esta cédula
+    $others = $wpdb->get_col( $wpdb->prepare("
+      SELECT e.code
+      FROM {$wpdb->prefix}asetec_tickets} t
+      JOIN {$wpdb->prefix}asetec_events e ON e.id=t.event_id
+      WHERE REPLACE(REPLACE(t.cedula,'-',''),' ','')=%s
+      GROUP BY e.code
+      ORDER BY e.code
+    ", $cedula) );
+    $hint = $others ? (' Tickets para esta cédula existen en: '.implode(', ', $others)) : '';
+    return new WP_Error('not_found', 'No existe ticket para esa cédula en este evento.'.$hint, ['status'=>404]);
   }
+
   if (!is_email($row['email'])) {
-    return new WP_Error('no_email', 'El asociado no tiene un correo válido', array('status'=>400));
+    return new WP_Error('no_email', 'El asociado no tiene correo válido en el ticket.', ['status'=>400]);
   }
 
-  // 3) Generar (o reutilizar) el PNG del QR para el token existente
+  // 3) Generar (o reutilizar) el PNG del QR del token existente
   if (!class_exists('Asetec_QR_Email')) {
-    return new WP_Error('deps', 'Servicio de email no disponible', array('status'=>500));
+    return new WP_Error('deps', 'Servicio de email no disponible.', ['status'=>500]);
   }
-
   $qr = Asetec_QR_Email::generate_qr_png($row['token'], $ev['code']);
   if (is_wp_error($qr)) return $qr;
 
-  // 4) Reenviar correo usando los datos del ticket existente
-  $ticket = array(
-    'entry_number' => intval($row['entry_number']),
+  // 4) Reenviar
+  $ticket = [
+    'entry_number' => (int)$row['entry_number'],
     'token'        => $row['token'],
-    'capacity'     => intval($row['capacity']),
-    'consumed'     => intval($row['consumed']),
+    'capacity'     => (int)$row['capacity'],
+    'consumed'     => (int)$row['consumed'],
     'email'        => $row['email'],
     'nombre'       => $row['nombre'],
     'cedula'       => $row['cedula'],
-  );
-  $event  = array('code'=>$ev['code'],'name'=>$ev['name']);
+  ];
+  $event  = ['code'=>$ev['code'], 'name'=>$ev['name']];
 
   $ok = Asetec_QR_Email::send_ticket_email($ticket, $event, $qr);
   if (is_wp_error($ok) || !$ok) {
-    return new WP_Error('send_fail', 'No se pudo reenviar el correo', array('status'=>500));
+    return new WP_Error('send_fail', 'No se pudo reenviar el correo.', ['status'=>500]);
   }
 
-  return array(
+  return [
     'success' => true,
-    'message' => 'QR reenviado a ' . $row['email'],
-    'ticket'  => array('entry_number'=>$ticket['entry_number'], 'cedula'=>$ticket['cedula']),
-  );
+    'message' => 'QR de '.$ev['code'].' reenviado a '.$row['email'],
+    'ticket'  => ['entry_number'=>$ticket['entry_number'], 'cedula'=>$ticket['cedula']],
+  ];
 }
+
 
 
   private function get_event($code){
