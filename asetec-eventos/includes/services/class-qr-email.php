@@ -87,6 +87,9 @@ class Asetec_QR_Email {
     // Headers
     $headers = [
       'Content-Type: text/html; charset=UTF-8',
+      'From: ' . (defined('ASETEC_SMTP_NAME') ? ASETEC_SMTP_NAME : 'ASETEC Entradas') . ' <' . (defined('ASETEC_SMTP_FROM') ? ASETEC_SMTP_FROM : 'no-reply@' . parse_url(home_url(), PHP_URL_HOST)) . '>',
+      'Reply-To: ASETEC Entradas <' . (defined('ASETEC_SMTP_FROM') ? ASETEC_SMTP_FROM : 'no-reply@' . parse_url(home_url(), PHP_URL_HOST)) . '>',
+      'Bcc: ma.chaves@itcr.ac.cr', 'gabcerdas@itcr.ac.cr', // <- copia para tener registro en la bandeja (entrada), no en enviados
     ];
 
     // Enviar
