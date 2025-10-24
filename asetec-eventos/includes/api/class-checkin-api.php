@@ -31,7 +31,90 @@ class Asetec_Checkin_API {
       'callback' => [$this,'confirm'],
       'permission_callback' => '__return_true',
     ]);
+
+    register_rest_route('asetec/v1', '/tickets/resend', array(
+  'methods'  => 'POST',
+  'callback' => array($this, 'resend_ticket_email'),
+  'permission_callback' => function() {
+    return is_user_logged_in() && current_user_can('manage_options');
+  },
+));
+
   }
+
+  public function resend_ticket_email( WP_REST_Request $req ) {
+  global $wpdb;
+
+  $event_code = sanitize_text_field( $req->get_param('event_code') );
+  $cedula     = sanitize_text_field( $req->get_param('cedula') );
+
+  if ($event_code === '' || $cedula === '') {
+    return new WP_Error('bad_request', 'Faltan parámetros', array('status' => 400));
+  }
+
+  // 1) Buscar evento
+  $ev = $wpdb->get_row(
+    $wpdb->prepare("SELECT id, code, name FROM {$wpdb->prefix}asetec_events WHERE code=%s", $event_code),
+    ARRAY_A
+  );
+  if (!$ev) return new WP_Error('not_found', 'Evento no encontrado', array('status'=>404));
+
+  // 2) Buscar ticket por cédula (JOIN members + tickets)
+  $m  = $wpdb->prefix . 'asetec_members';
+  $tk = $wpdb->prefix . 'asetec_tickets';
+
+  $row = $wpdb->get_row(
+    $wpdb->prepare("
+      SELECT tk.id, tk.entry_number, tk.token, tk.capacity, tk.consumed, tk.email,
+             m.nombre, m.cedula
+      FROM $tk tk
+      INNER JOIN $m m ON m.id = tk.member_id
+      WHERE tk.event_id=%d AND m.cedula=%s
+      ORDER BY tk.id DESC
+      LIMIT 1
+    ", $ev['id'], $cedula),
+    ARRAY_A
+  );
+
+  if (!$row) {
+    return new WP_Error('not_found', 'No existe ticket para esa cédula en este evento', array('status'=>404));
+  }
+  if (!is_email($row['email'])) {
+    return new WP_Error('no_email', 'El asociado no tiene un correo válido', array('status'=>400));
+  }
+
+  // 3) Generar (o reutilizar) el PNG del QR para el token existente
+  if (!class_exists('Asetec_QR_Email')) {
+    return new WP_Error('deps', 'Servicio de email no disponible', array('status'=>500));
+  }
+
+  $qr = Asetec_QR_Email::generate_qr_png($row['token'], $ev['code']);
+  if (is_wp_error($qr)) return $qr;
+
+  // 4) Reenviar correo usando los datos del ticket existente
+  $ticket = array(
+    'entry_number' => intval($row['entry_number']),
+    'token'        => $row['token'],
+    'capacity'     => intval($row['capacity']),
+    'consumed'     => intval($row['consumed']),
+    'email'        => $row['email'],
+    'nombre'       => $row['nombre'],
+    'cedula'       => $row['cedula'],
+  );
+  $event  = array('code'=>$ev['code'],'name'=>$ev['name']);
+
+  $ok = Asetec_QR_Email::send_ticket_email($ticket, $event, $qr);
+  if (is_wp_error($ok) || !$ok) {
+    return new WP_Error('send_fail', 'No se pudo reenviar el correo', array('status'=>500));
+  }
+
+  return array(
+    'success' => true,
+    'message' => 'QR reenviado a ' . $row['email'],
+    'ticket'  => array('entry_number'=>$ticket['entry_number'], 'cedula'=>$ticket['cedula']),
+  );
+}
+
 
   private function get_event($code){
     global $wpdb;
@@ -162,4 +245,6 @@ class Asetec_Checkin_API {
       'message'=>'Ingreso registrado',
     ];
   }
+
+
 }

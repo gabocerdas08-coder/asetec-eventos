@@ -43,6 +43,7 @@ function asetec_sc_event_board($atts=[]) {
         <th style="text-align:center;">Solicitó QR</th>
         <th style="text-align:center;">Check-in</th>
         <th style="text-align:center;">Cupo</th>
+        <th style="text-align:center;">Acciones</th> <!-- NUEVA -->
       </tr>
     </thead>
 
@@ -58,6 +59,11 @@ function asetec_sc_event_board($atts=[]) {
     const exportURL = <?php echo json_encode($export_url); ?>;
     const EVENT     = <?php echo json_encode($event_code); ?>;
     const PER_PAGE  = <?php echo (int)$per_page; ?>;
+
+    const canResend = <?php echo ( is_user_logged_in() && current_user_can('manage_options') ) ? 'true' : 'false'; ?>;
+    const resendURL = <?php echo json_encode( esc_url_raw( rest_url('asetec/v1/tickets/resend') ) ); ?>;
+    const NONCE     = <?php echo json_encode( wp_create_nonce('wp_rest') ); ?>;
+
 
     const $search = document.getElementById('ab-search');
     const $status = document.getElementById('ab-status');
@@ -86,6 +92,12 @@ function asetec_sc_event_board($atts=[]) {
           (data.items || []).forEach(it => {
             const tr = document.createElement('tr');
             const cupo = (it.solicito_qr ? `${it.consumed||0}/${it.capacity||0}` : '–');
+
+            // Si el usuario es staff y el asociado solicitó QR, mostramos botón.
+            const acciones = (canResend && it.solicito_qr)
+              ? `<button class="button ab-resend" data-ced="${it.cedula}">Reenviar QR</button>`
+              : '—';
+
             tr.innerHTML = `
               <td>${it.cedula}</td>
               <td>${it.nombre}</td>
@@ -93,10 +105,11 @@ function asetec_sc_event_board($atts=[]) {
               <td style="text-align:center">${mark(it.solicito_qr)}</td>
               <td style="text-align:center">${mark(it.check_in)}</td>
               <td style="text-align:center">${cupo}</td>
+              <td style="text-align:center">${acciones}</td> <!-- NUEVA COLUMNA -->
             `;
-
             $tbody.appendChild(tr);
           });
+
 
           const total = data.total || 0;
           const pages = Math.max(1, Math.ceil(total / PER_PAGE));
@@ -127,7 +140,39 @@ function asetec_sc_event_board($atts=[]) {
       clearTimeout(typingTimer);
       typingTimer = setTimeout(() => { page = 1; fetchData(); }, 250);
     });
+    $tbody.addEventListener('click', (e) => {
+      if (e.target.classList.contains('ab-resend')) {
+        const cedula = e.target.dataset.ced;
+        e.target.disabled = true;
+        e.target.textContent = 'Enviando…';
 
+        fetch(resendURL, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-WP-Nonce': NONCE,
+          },
+          body: JSON.stringify({ event_code: EVENT, cedula: cedula }),
+        })
+        .then(r => r.json())
+        .then(j => {
+          if (!j.success) {
+            alert('Error al reenviar: ' + (j.message || 'desconocido'));
+            e.target.disabled = false;
+            e.target.textContent = 'Reenviar QR';
+            return;
+          }
+          e.target.textContent = 'Enviado ✓';
+        })
+        .catch(err => {
+          console.error('Error al reenviar QR', err);
+          alert('Error al reenviar el QR.');
+          e.target.disabled = false;
+          e.target.textContent = 'Reenviar QR';
+        });
+      }
+    });
     fetchData();
   })();
   </script>
